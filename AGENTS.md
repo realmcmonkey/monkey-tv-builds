@@ -57,6 +57,7 @@ Monkey TV is a legitimate streaming-site launcher, never a content host or DRM w
 - Hand off every final distributable as a private, one-click downloadable file link in the user's chat/session.
 - Do not publish Monkey TV builds publicly. Use a private host only if a future environment requires hosting.
 - Use the final artifact in `builds/` as the source for the private download link.
-- The chosen private host is the GitHub repository `realmcmonkey/monkey-tv-builds`; create one private GitHub Release per final version and attach only its final ZIP.
+- The chosen private host is the GitHub repository `realmcmonkey/monkey-tv-builds`. For every explicitly authorized Monkey TV release push, create one private GitHub prerelease whose tag contains the alpha version and build number (for example, `v0.0.2-alpha-build1`).
+- Attach the final single-file `MonkeyTV.exe` directly to that GitHub Release so the user can download it from GitHub. A clean portable ZIP may be attached as an additional convenience artifact, but it must not replace the EXE attachment.
 - Return the authenticated HTTPS asset-download URL as the primary link. The user must be signed in to the authorized GitHub account.
 - Never upload intermediate/debug builds, test profiles, cookies, credentials, or non-final artifacts.
