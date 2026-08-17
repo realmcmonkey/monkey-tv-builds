@@ -1,0 +1,902 @@
+using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.Wpf;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
+using System.Runtime.InteropServices;
+using System.Windows.Interop;
+using Microsoft.Win32;
+
+namespace MonkeyTV;
+
+public partial class MainWindow : Window
+{
+    private MonkeySettings _settings;
+    private readonly SettingsStore _store;
+    private WebView2? _webView;
+    private readonly DispatcherTimer _clockTimer;
+    private readonly DispatcherTimer _serviceUiTimer;
+    private readonly ServiceControlsWindow _serviceControls;
+    private long _browserGeneration;
+    private Guid? _activeServiceId;
+    private bool _isBrowserLaunching;
+    private bool _appFullscreen;
+    private bool _websiteFullscreen;
+    private bool _shellFullscreen;
+    private bool _cursorHidden;
+    private DateTime _lastPointerActivity = DateTime.UtcNow;
+    private NativePoint _lastPointerPosition;
+    private WindowStyle _previousStyle;
+    private WindowState _previousState;
+    private ResizeMode _previousResizeMode;
+    private bool _previousTopmost;
+    private Rect _previousBounds;
+    private Point _dragStart;
+    private bool _dragInProgress;
+    private ServiceDefinition? _dragService;
+    private bool _browserProcessFailed;
+    private bool _closing;
+
+    public MainWindow(MonkeySettings settings, SettingsStore store)
+    {
+        InitializeComponent(); _settings = settings; _store = store;
+        _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _clockTimer.Tick += (_, _) => ClockText.Text = DateTime.Now.ToString("h:mm tt");
+        _clockTimer.Start();
+        _serviceControls = new ServiceControlsWindow();
+        _serviceControls.BackRequested += (_, _) => BrowserBack_Click(this, new RoutedEventArgs());
+        _serviceControls.ReloadRequested += (_, _) => BrowserReload_Click(this, new RoutedEventArgs());
+        _serviceControls.HomeRequested += async (_, _) => await ReturnHomeAsync();
+        _serviceControls.FullscreenRequested += (_, _) => ToggleApplicationFullscreen();
+        _serviceControls.UserActivity += (_, _) => NoteServiceActivity(showControls: true);
+        _serviceUiTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(125) };
+        _serviceUiTimer.Tick += ServiceUiTimer_Tick;
+        Loaded += (_, _) => _serviceControls.Owner = this;
+        LocationChanged += (_, _) => PositionServiceControls();
+        SizeChanged += (_, _) => PositionServiceControls();
+        StateChanged += (_, _) => Dispatcher.BeginInvoke(PositionServiceControls);
+        Deactivated += (_, _) => { if (_webView is not null && !_websiteFullscreen) _serviceControls.HideOverlay(true); };
+        Closing += MainWindow_Closing;
+        Closed += (_, _) => Application.Current.Shutdown();
+        RenderHome();
+    }
+
+    private void RenderHome()
+    {
+        ClockText.Visibility = _settings.ShowClock ? Visibility.Visible : Visibility.Collapsed;
+        var filter = SearchBox.Text?.Trim() ?? "";
+        var services = _settings.Services.Where(s => s.Name.Contains(filter, StringComparison.CurrentCultureIgnoreCase)).ToList();
+        ServicesPanel.Children.Clear();
+        foreach (var service in services)
+            ServicesPanel.Children.Add(CreateTile(service));
+
+        ServicesSummaryText.Text = string.IsNullOrWhiteSpace(filter)
+            ? _settings.Services.Count switch { 0 => "Ready when you are", 1 => "1 configured service", _ => $"{_settings.Services.Count} configured services" }
+            : services.Count switch { 0 => $"No services match “{filter}”", 1 => "1 matching service", _ => $"{services.Count} matching services" };
+
+        EmptyState.Visibility = services.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (_settings.Services.Count == 0)
+        {
+            EmptyTitle.Text = "Your services will appear here";
+            EmptyDescription.Text = "Add a streaming website to create your first launcher card. Nothing is loaded until you click it.";
+            EmptyAddButton.Visibility = Visibility.Visible;
+        }
+        else if (services.Count == 0)
+        {
+            EmptyTitle.Text = "No matching services";
+            EmptyDescription.Text = "Search only checks the names of services you have configured.";
+            EmptyAddButton.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private Button CreateTile(ServiceDefinition service)
+    {
+        var banner = _settings.CardStyle == ServiceCardStyle.Banner;
+        var (width, height) = banner
+            ? _settings.TileSize switch { TileSize.Small => (210d, 118d), TileSize.Large => (336d, 189d), _ => (270d, 152d) }
+            : _settings.TileSize switch { TileSize.Small => (128d, 128d), TileSize.Large => (220d, 220d), _ => (170d, 170d) };
+
+        var button = new Button
+        {
+            Width = width,
+            Margin = new Thickness(0, 0, banner ? 20 : 18, 24),
+            Tag = service,
+            Style = (Style)FindResource("ServiceCardButtonStyle"),
+            RenderTransformOrigin = new Point(.5, .5),
+            ToolTip = $"Open {service.Name}"
+        };
+        System.Windows.Automation.AutomationProperties.SetName(button, service.Name);
+
+        var transform = new TransformGroup();
+        var scale = new ScaleTransform(1, 1);
+        var lift = new TranslateTransform(0, 0);
+        transform.Children.Add(scale); transform.Children.Add(lift); button.RenderTransform = transform;
+        var shadow = new DropShadowEffect { Color = Colors.Black, BlurRadius = 18, ShadowDepth = 7, Opacity = .32, Direction = 270 };
+        button.Effect = shadow;
+
+        var content = new StackPanel();
+        var card = new Border
+        {
+            Width = width,
+            Height = height,
+            CornerRadius = new CornerRadius(banner ? 16 : 18),
+            Background = CreateCardBackground(service),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(32, 255, 255, 255)),
+            BorderThickness = new Thickness(1),
+            ClipToBounds = true
+        };
+        card.Child = CreateCardArtwork(service, width, height, banner);
+        content.Children.Add(card);
+        if (_settings.ShowServiceNames)
+        {
+            content.Children.Add(new TextBlock
+            {
+                Text = service.Name,
+                FontSize = banner ? 14 : 15,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(4, 11, 4, 0),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                MaxWidth = width - 8
+            });
+        }
+
+        button.Content = content;
+        button.MouseEnter += (_, _) => AnimateCard(scale, lift, shadow, 1.025, -3, 25, .48);
+        button.MouseLeave += (_, _) => AnimateCard(scale, lift, shadow, 1, 0, 18, .32);
+        button.Click += async (_, _) => { if (!_dragInProgress) await OpenServiceAsync(service); };
+        button.PreviewMouseLeftButtonDown += (_, e) => BeginServiceDrag(button, service, e);
+        button.PreviewMouseMove += ContinueServiceDrag;
+        button.PreviewMouseLeftButtonUp += FinishServiceDrag;
+        button.ContextMenu = CreateServiceContextMenu(service);
+        return button;
+    }
+
+    private Grid CreateCardArtwork(ServiceDefinition service, double width, double height, bool banner)
+    {
+        var grid = new Grid();
+        var bannerFile = banner ? ResolveAsset(service.BannerPath) : null;
+        if (bannerFile is not null && TryLoadImage(bannerFile) is { } artwork)
+        {
+            grid.Children.Add(new System.Windows.Shapes.Rectangle
+            {
+                RadiusX = 16,
+                RadiusY = 16,
+                Fill = new ImageBrush(artwork) { Stretch = service.BannerFit == BannerFit.Fit ? Stretch.Uniform : Stretch.UniformToFill, AlignmentX = AlignmentX.Center, AlignmentY = AlignmentY.Center }
+            });
+            grid.Children.Add(new System.Windows.Shapes.Rectangle
+            {
+                RadiusX = 16,
+                RadiusY = 16,
+                Fill = new LinearGradientBrush(Color.FromArgb(0, 0, 0, 0), Color.FromArgb(68, 0, 0, 0), new Point(.5, 0), new Point(.5, 1))
+            });
+            return grid;
+        }
+
+        var iconFile = ResolveAsset(service.IconPath);
+        var logoSize = Math.Min(height * (banner ? .46 : .48), width * .42);
+        var logoSurface = new Border
+        {
+            Width = logoSize,
+            Height = logoSize,
+            CornerRadius = new CornerRadius(banner ? 14 : 18),
+            Background = new SolidColorBrush(Color.FromArgb(88, 255, 255, 255)),
+            Padding = new Thickness(logoSize * .15),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        if (iconFile is not null && TryLoadImage(iconFile) is { } icon)
+            logoSurface.Child = new Image { Source = icon, Stretch = Stretch.Uniform };
+        else
+            logoSurface.Child = Initial(service.Name, banner ? 28 : 32);
+        grid.Children.Add(logoSurface);
+
+        if (iconFile is null && !_settings.ShowServiceNames)
+        {
+            grid.Children.Add(new TextBlock
+            {
+                Text = service.Name,
+                FontSize = banner ? 15 : 14,
+                FontWeight = FontWeights.SemiBold,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Bottom,
+                Margin = new Thickness(14, 0, 14, height * .1),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxWidth = width - 28
+            });
+            logoSurface.Margin = new Thickness(0, 0, 0, height * .16);
+        }
+        return grid;
+    }
+
+    private ContextMenu CreateServiceContextMenu(ServiceDefinition service)
+    {
+        var menu = new ContextMenu();
+        void Add(string header, Action action, bool enabled = true)
+        {
+            var item = new MenuItem { Header = header, IsEnabled = enabled };
+            item.Click += (_, _) => action(); menu.Items.Add(item);
+        }
+        Add("Open", () => _ = OpenServiceAsync(service));
+        Add("Edit", () => EditService(service));
+        menu.Items.Add(new Separator());
+        var index = _settings.Services.IndexOf(service);
+        Add("Move left", () => MoveService(service, -1), index > 0);
+        Add("Move right", () => MoveService(service, 1), index >= 0 && index < _settings.Services.Count - 1);
+        Add("Change banner…", () => ChangeBanner(service));
+        Add("Clear temporary data…", () => ClearTemporaryDataWithConfirmation(service));
+        menu.Items.Add(new Separator());
+        Add("Remove…", () => RemoveService(service));
+        return menu;
+    }
+
+    private void BeginServiceDrag(Button button, ServiceDefinition service, MouseButtonEventArgs e)
+    {
+        _dragStart = e.GetPosition(button);
+        _dragInProgress = false;
+        _dragService = service;
+        button.CaptureMouse();
+    }
+
+    private void ContinueServiceDrag(object sender, MouseEventArgs e)
+    {
+        if (sender is not Button button || _dragService is null || e.LeftButton != MouseButtonState.Pressed) return;
+        var point = e.GetPosition(button);
+        if (!_dragInProgress &&
+            Math.Abs(point.X - _dragStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(point.Y - _dragStart.Y) < SystemParameters.MinimumVerticalDragDistance) return;
+        _dragInProgress = true;
+        e.Handled = true;
+    }
+
+    private void FinishServiceDrag(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not Button button || _dragService is null) return;
+        button.ReleaseMouseCapture();
+        if (!_dragInProgress)
+        {
+            var clickedService = _dragService;
+            _dragService = null;
+            e.Handled = true;
+            _ = OpenServiceAsync(clickedService);
+            return;
+        }
+
+        var pointInPanel = e.GetPosition(ServicesPanel);
+        var target = ServicesPanel.Children.OfType<Button>().FirstOrDefault(candidate =>
+        {
+            var origin = candidate.TranslatePoint(new Point(), ServicesPanel);
+            return new Rect(origin, candidate.RenderSize).Contains(pointInPanel);
+        })?.Tag as ServiceDefinition;
+        var source = _dragService;
+        _dragService = null;
+        if (target is not null && target.Id != source.Id) ReorderBefore(source, target);
+        e.Handled = true;
+        Dispatcher.BeginInvoke(() => _dragInProgress = false);
+    }
+
+    private void ReorderBefore(ServiceDefinition source, ServiceDefinition target)
+    {
+        var from = _settings.Services.IndexOf(source); var to = _settings.Services.IndexOf(target);
+        if (from < 0 || to < 0 || from == to) return;
+        _settings.Services.RemoveAt(from); if (from < to) to--; _settings.Services.Insert(to, source);
+        _store.Save(_settings); RenderHome();
+    }
+
+    private void ServicesPanel_Drop(object sender, DragEventArgs e)
+    {
+        if (!Guid.TryParse(e.Data.GetData(DataFormats.Text) as string, out var sourceId)) return;
+        var from = _settings.Services.FindIndex(s => s.Id == sourceId); if (from < 0) return;
+        var item = _settings.Services[from]; _settings.Services.RemoveAt(from); _settings.Services.Add(item); _store.Save(_settings); RenderHome(); e.Handled = true;
+    }
+
+    private void Service_DragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = e.Data.GetDataPresent(DataFormats.Text) ? DragDropEffects.Move : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void MoveService(ServiceDefinition service, int delta)
+    {
+        var from = _settings.Services.IndexOf(service); var to = from + delta;
+        if (from < 0 || to < 0 || to >= _settings.Services.Count) return;
+        _settings.Services.RemoveAt(from); _settings.Services.Insert(to, service); _store.Save(_settings); RenderHome();
+    }
+
+    private void EditService(ServiceDefinition service)
+    {
+        var index = _settings.Services.IndexOf(service); if (index < 0) return;
+        var editor = new ServiceEditorWindow(service) { Owner = this };
+        if (editor.ShowDialog() != true) return;
+        if (editor.ClearDataRequested) ClearServiceData(service.Id);
+        _settings.Services[index] = editor.Result; _store.Save(_settings); StorageService.CleanupOrphanAssets(_settings); RenderHome();
+    }
+
+    private void ChangeBanner(ServiceDefinition service)
+    {
+        var picker = new OpenFileDialog { Filter = "Images|*.png;*.jpg;*.jpeg;*.webp;*.bmp|All files|*.*" };
+        if (picker.ShowDialog(this) != true) return;
+        try { service.BannerPath = PortableAssetImporter.ImportBanner(picker.FileName, service.Id); _store.Save(_settings); StorageService.CleanupOrphanAssets(_settings); RenderHome(); }
+        catch (Exception ex) { AppLog.Write("artwork", ex.Message); }
+    }
+
+    private void ClearTemporaryDataWithConfirmation(ServiceDefinition service)
+    {
+        var confirmation = new ConfirmWindow("Clear temporary data?", $"Remove disposable browser cache for {service.Name}? Login and persistent site storage will be kept.", "Clear") { Owner = this };
+        if (confirmation.ShowDialog() == true) ClearTemporaryServiceData(service.Id);
+    }
+
+    private void RemoveService(ServiceDefinition service)
+    {
+        var confirmation = new ConfirmWindow("Remove service?", $"Remove {service.Name} and its isolated legacy browser profile? This signs the service out if it uses a legacy profile.", "Remove") { Owner = this };
+        if (confirmation.ShowDialog() != true) return;
+        if (service.BrowserStorageMode != BrowserStorageMode.SharedProfile) ClearServiceData(service.Id);
+        else
+        {
+            service.FutureSettings.TryGetValue("SharedProfilePath", out var profilePath);
+            StorageService.QueueSharedProfileDeletion(profilePath);
+            if (_webView is null) StorageService.CleanupQueuedSharedProfileDeletes();
+        }
+        _settings.Services.Remove(service); _store.Save(_settings); StorageService.CleanupOrphanAssets(_settings); RenderHome();
+    }
+
+    private static Brush CreateCardBackground(ServiceDefinition service)
+    {
+        var palettes = new[]
+        {
+            (Color.FromRgb(48, 44, 70), Color.FromRgb(27, 29, 43)),
+            (Color.FromRgb(31, 58, 72), Color.FromRgb(22, 31, 42)),
+            (Color.FromRgb(67, 41, 55), Color.FromRgb(34, 27, 38)),
+            (Color.FromRgb(43, 57, 48), Color.FromRgb(25, 32, 31))
+        };
+        var pair = palettes[(service.Id.GetHashCode() & int.MaxValue) % palettes.Length];
+        return new LinearGradientBrush(pair.Item1, pair.Item2, new Point(0, 0), new Point(1, 1));
+    }
+
+    private static void AnimateCard(ScaleTransform scale, TranslateTransform lift, DropShadowEffect shadow, double targetScale, double targetY, double blur, double opacity)
+    {
+        var duration = new Duration(TimeSpan.FromMilliseconds(140));
+        var easing = new QuadraticEase { EasingMode = EasingMode.EaseOut };
+        scale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(targetScale, duration) { EasingFunction = easing });
+        scale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(targetScale, duration) { EasingFunction = easing });
+        lift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(targetY, duration) { EasingFunction = easing });
+        shadow.BeginAnimation(DropShadowEffect.BlurRadiusProperty, new DoubleAnimation(blur, duration) { EasingFunction = easing });
+        shadow.BeginAnimation(DropShadowEffect.OpacityProperty, new DoubleAnimation(opacity, duration) { EasingFunction = easing });
+    }
+
+    private static TextBlock Initial(string name, double fontSize = 26) => new() { Text = string.IsNullOrWhiteSpace(name) ? "?" : name[..1].ToUpperInvariant(), FontSize = fontSize, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+    private static string? ResolveAsset(string? path) { if (string.IsNullOrWhiteSpace(path)) return null; var file = Path.IsPathRooted(path) ? path : Path.Combine(PortablePaths.AppRoot, path); return File.Exists(file) ? file : null; }
+    private static BitmapImage? TryLoadImage(string file)
+    {
+        try
+        {
+            var image = new BitmapImage();
+            image.BeginInit(); image.CacheOption = BitmapCacheOption.OnLoad; image.UriSource = new Uri(file); image.EndInit(); image.Freeze();
+            return image;
+        }
+        catch { return null; }
+    }
+    private async Task OpenServiceAsync(ServiceDefinition service)
+    {
+        if (_activeServiceId == service.Id && (_webView is not null || _isBrowserLaunching))
+        {
+            HomeView.Visibility = Visibility.Collapsed;
+            BrowserView.Visibility = Visibility.Visible;
+            if (_webView?.CoreWebView2 is not null)
+            {
+                try { _webView.CoreWebView2.Resume(); } catch { }
+                LoadingOverlay.Visibility = Visibility.Collapsed;
+            }
+            StartServiceUi();
+            return;
+        }
+
+        // A different service always replaces the one suspended behind Home.
+        if (_webView is not null || _isBrowserLaunching || _activeServiceId is not null)
+            DestroyBrowser();
+
+        var generation = ++_browserGeneration;
+        _browserProcessFailed = false;
+        _activeServiceId = service.Id;
+        _isBrowserLaunching = true;
+        RemoveStaleBrowserChildren();
+        HomeView.Visibility = Visibility.Collapsed; BrowserView.Visibility = Visibility.Visible; LoadingOverlay.Visibility = Visibility.Visible; ErrorOverlay.Visibility = Visibility.Collapsed;
+        LoadingText.Text = $"Opening {service.Name}…";
+        try
+        {
+            var useLegacyProfile = service.BrowserStorageMode != BrowserStorageMode.SharedProfile && PortablePaths.HasLegacyProfile(service.Id);
+            var userDataFolder = useLegacyProfile ? PortablePaths.LegacyProfileFor(service.Id) : PortablePaths.SharedBrowserUserDataDirectory;
+            var environment = await CoreWebView2Environment.CreateAsync(null, userDataFolder);
+            if (generation != _browserGeneration) return;
+
+            var view = new WebView2
+            {
+                Visibility = Visibility.Collapsed
+            };
+            _webView = view; BrowserHost.Children.Add(view);
+            if (useLegacyProfile)
+                await view.EnsureCoreWebView2Async(environment);
+            else
+            {
+                var controllerOptions = environment.CreateCoreWebView2ControllerOptions();
+                controllerOptions.ProfileName = PortablePaths.SharedProfileName(service.Id);
+                await view.EnsureCoreWebView2Async(environment, controllerOptions);
+            }
+            if (generation != _browserGeneration || !ReferenceEquals(_webView, view))
+            {
+                DisposeView(view);
+                return;
+            }
+
+            // Apply the selected service identity and all browser settings before first navigation.
+            var resolvedUserAgent = BrowserIdentity.ResolveUserAgent(service);
+            if (!useLegacyProfile)
+            {
+                var relativeProfilePath = Path.GetRelativePath(PortablePaths.AppRoot, view.CoreWebView2.Profile.ProfilePath);
+                if (!service.FutureSettings.TryGetValue("SharedProfilePath", out var existingPath) || !string.Equals(existingPath, relativeProfilePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    service.FutureSettings["SharedProfilePath"] = relativeProfilePath;
+                    _store.Save(_settings);
+                }
+            }
+            if (resolvedUserAgent is not null) view.CoreWebView2.Settings.UserAgent = resolvedUserAgent;
+            view.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
+            view.CoreWebView2.Settings.AreDevToolsEnabled = false;
+            view.CoreWebView2.Settings.IsStatusBarEnabled = false;
+            view.CoreWebView2.Settings.IsZoomControlEnabled = true;
+            // WPF WebView2 forwards accelerator keys into the WPF input route.
+            view.PreviewKeyDown += (_, e) =>
+            {
+                if (HandleApplicationShortcut(e)) return;
+                if (e.Key == Key.F11)
+                {
+                    e.Handled = true;
+                    Dispatcher.BeginInvoke(ToggleApplicationFullscreen);
+                }
+                else if (e.Key == Key.Escape && !_websiteFullscreen && _appFullscreen)
+                {
+                    e.Handled = true;
+                    Dispatcher.BeginInvoke(() => SetApplicationFullscreen(false));
+                }
+            };
+            view.CoreWebView2.NewWindowRequested += (_, e) => { e.Handled = true; view.CoreWebView2.Navigate(e.Uri); };
+            view.CoreWebView2.NavigationStarting += (_, _) => Dispatcher.Invoke(() =>
+            {
+                if (generation != _browserGeneration || !ReferenceEquals(_webView, view)) return;
+                ErrorOverlay.Visibility = Visibility.Collapsed; LoadingOverlay.Visibility = Visibility.Visible;
+            });
+            view.CoreWebView2.ContainsFullScreenElementChanged += (_, _) => Dispatcher.Invoke(() =>
+            {
+                if (generation == _browserGeneration && ReferenceEquals(_webView, view))
+                    SetWebsiteFullscreen(view.CoreWebView2.ContainsFullScreenElement);
+            });
+            view.NavigationCompleted += (_, e) =>
+            {
+                if (generation != _browserGeneration || !ReferenceEquals(_webView, view)) return;
+                if (e.IsSuccess)
+                {
+                    view.Visibility = Visibility.Visible; LoadingOverlay.Visibility = Visibility.Collapsed; ErrorOverlay.Visibility = Visibility.Collapsed;
+                    _ = EnforceActiveCacheBudgetAsync(view, generation);
+                }
+                else ShowServiceError(service, "Something went wrong while connecting to this service.", "WebView2 navigation status: " + e.WebErrorStatus);
+            };
+            view.CoreWebView2.ProcessFailed += (_, e) => Dispatcher.Invoke(() =>
+            {
+                if (generation != _browserGeneration || !ReferenceEquals(_webView, view)) return;
+                _browserProcessFailed = true;
+                ShowServiceError(service, "The browser process stopped unexpectedly.", "WebView2 process failure: " + e.ProcessFailedKind);
+            });
+            view.CoreWebView2.Navigate(service.Url);
+            _isBrowserLaunching = false;
+            StartServiceUi();
+        }
+        catch (Exception ex)
+        {
+            if (generation == _browserGeneration)
+            {
+                _isBrowserLaunching = false;
+                ShowServiceError(service, "Monkey TV couldn't start the browser for this service.", ex.GetType().Name + ": " + ex.Message);
+            }
+        }
+    }
+
+    private void ShowServiceError(ServiceDefinition service, string message, string details)
+    {
+        LoadingOverlay.Visibility = Visibility.Collapsed; ErrorOverlay.Visibility = Visibility.Visible;
+        if (_webView is not null) _webView.Visibility = Visibility.Collapsed;
+        ErrorTitle.Text = $"Couldn't load {service.Name}"; ErrorMessage.Text = message; ErrorDetails.Text = details;
+        AppLog.Write("browser", $"{service.Name}: {details}");
+        StopServiceUi();
+    }
+
+    private async Task EnforceActiveCacheBudgetAsync(WebView2 view, long generation)
+    {
+        // The supported API clears only HTTP/disk cache. DOM storage, cookies, service workers,
+        // IndexedDB and provider state are deliberately excluded.
+        if (generation != _browserGeneration || !ReferenceEquals(_webView, view) || !StorageService.ShouldClearActiveDiskCache()) return;
+        await StorageService.ClearActiveDiskCacheAsync(view.CoreWebView2?.Profile);
+    }
+
+    private async void RetryService_Click(object sender, RoutedEventArgs e)
+    {
+        if (_activeServiceId is not { } id || _settings.Services.FirstOrDefault(s => s.Id == id) is not { } service) { await ReturnHomeAsync(); return; }
+        ErrorOverlay.Visibility = Visibility.Collapsed; LoadingOverlay.Visibility = Visibility.Visible;
+        if (_browserProcessFailed || _webView?.CoreWebView2 is null)
+        {
+            DestroyBrowser(); await OpenServiceAsync(service); return;
+        }
+        StartServiceUi(); _webView.CoreWebView2.Navigate(service.Url);
+    }
+
+    private void DestroyBrowser()
+    {
+        ++_browserGeneration;
+        _isBrowserLaunching = false;
+        _activeServiceId = null;
+        _browserProcessFailed = false;
+        StopServiceUi();
+        SetWebsiteFullscreen(false);
+        var view = _webView; _webView = null;
+        if (view is not null) DisposeView(view);
+        RemoveStaleBrowserChildren();
+    }
+
+    private void DisposeView(WebView2 view)
+    {
+        // Never allow one WebView2 cleanup failure to skip visual removal or disposal.
+        try { BrowserHost.Children.Remove(view); } catch { }
+        try { view.CoreWebView2?.Resume(); } catch { }
+        try { view.CoreWebView2?.Stop(); } catch { }
+        try { view.Dispose(); } catch { }
+    }
+
+    private void RemoveStaleBrowserChildren()
+    {
+        foreach (var stale in BrowserHost.Children.OfType<WebView2>().ToArray())
+        {
+            try { BrowserHost.Children.Remove(stale); } catch { }
+            if (!ReferenceEquals(stale, _webView))
+            {
+                try { stale.CoreWebView2?.Stop(); } catch { }
+                try { stale.Dispose(); } catch { }
+            }
+        }
+    }
+
+    private async Task ReturnHomeAsync()
+    {
+        StopServiceUi();
+        if (_webView?.CoreWebView2 is not null)
+        {
+            try { await _webView.CoreWebView2.TrySuspendAsync(); } catch { }
+        }
+        BrowserView.Visibility = Visibility.Collapsed; HomeView.Visibility = Visibility.Visible; RenderHome();
+        UpdateHomeChrome();
+    }
+
+    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e) { if (IsLoaded) RenderHome(); }
+    private void SearchToggle_Click(object sender, RoutedEventArgs e)
+    {
+        SearchContainer.Visibility = Visibility.Visible;
+        HeaderAddServiceButton.Visibility = Visibility.Collapsed;
+        SearchBox.Focus(); SearchBox.SelectAll();
+    }
+    private void CloseSearch_Click(object sender, RoutedEventArgs e)
+    {
+        SearchBox.Clear(); SearchContainer.Visibility = Visibility.Collapsed; HeaderAddServiceButton.Visibility = Visibility.Visible;
+    }
+    private void AddService_Click(object sender, RoutedEventArgs e)
+    {
+        var editor = new ServiceEditorWindow { Owner = this };
+        if (editor.ShowDialog() != true) return;
+        _settings.Services.Add(editor.Result); _store.Save(_settings); RenderHome();
+    }
+    private void BrowserBack_Click(object sender, RoutedEventArgs e) { if (_webView?.CanGoBack == true) _webView.GoBack(); }
+    private void BrowserReload_Click(object sender, RoutedEventArgs e) { _webView?.Reload(); }
+    private async void BrowserHome_Click(object sender, RoutedEventArgs e) => await ReturnHomeAsync();
+    private void Fullscreen_Click(object sender, RoutedEventArgs e) => ToggleApplicationFullscreen();
+
+    private void Settings_Click(object sender, RoutedEventArgs e)
+    {
+        var serviceWasVisible = BrowserView.Visibility == Visibility.Visible;
+        if (serviceWasVisible) StopServiceUi();
+        var settings = new SettingsWindow(_settings, _store) { Owner = this };
+        settings.ShowDialog(); _settings = _store.Load();
+        if (_activeServiceId is { } activeId && _settings.Services.All(s => s.Id != activeId)) DestroyBrowser();
+        RenderHome();
+        if (serviceWasVisible && _webView is not null) StartServiceUi();
+    }
+
+    private void Window_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (HandleApplicationShortcut(e)) return;
+        if (e.Key == Key.F11) { ToggleApplicationFullscreen(); e.Handled = true; }
+        else if (e.Key == Key.Escape && _websiteFullscreen) { return; }
+        else if (e.Key == Key.Escape && _appFullscreen) { SetApplicationFullscreen(false); e.Handled = true; }
+        else if (e.Key == Key.Escape && SearchContainer.Visibility == Visibility.Visible) { CloseSearch_Click(this, e); e.Handled = true; }
+    }
+
+    private bool HandleApplicationShortcut(KeyEventArgs e)
+    {
+        var modifiers = Keyboard.Modifiers;
+        var serviceActive = _webView is not null && BrowserView.Visibility == Visibility.Visible;
+        if (e.Key == Key.Left && modifiers == ModifierKeys.Alt && serviceActive)
+        { BrowserBack_Click(this, e); e.Handled = true; return true; }
+        if (e.Key == Key.R && modifiers == ModifierKeys.Control && serviceActive)
+        { BrowserReload_Click(this, e); e.Handled = true; return true; }
+        if (e.Key == Key.H && modifiers == ModifierKeys.Control && serviceActive)
+        { e.Handled = true; _ = ReturnHomeAsync(); return true; }
+        if (e.Key == Key.OemComma && modifiers == ModifierKeys.Control)
+        { e.Handled = true; Settings_Click(this, e); return true; }
+        return false;
+    }
+
+    internal void ClearTemporaryServiceData(Guid serviceId)
+    {
+        if (_activeServiceId == serviceId) DestroyBrowser();
+        StorageService.ClearTemporaryData(serviceId);
+    }
+
+    internal async Task ClearTemporaryDataAsync()
+    {
+        await StorageService.ClearActiveDiskCacheAsync(_webView?.CoreWebView2?.Profile);
+        StorageService.ClearAllTemporaryData(includeReplaceableComponents: true);
+    }
+
+    internal void ClearServiceData(Guid serviceId)
+    {
+        if (_activeServiceId == serviceId) DestroyBrowser();
+        try { StorageService.ClearServiceData(serviceId); }
+        catch (Exception ex) { AppLog.Write("storage", ex.Message); }
+    }
+
+    internal void PrepareForConfigurationImport() => DestroyBrowser();
+
+    internal void ClearAllBrowserData()
+    {
+        DestroyBrowser();
+        try { StorageService.ResetBrowserData(); }
+        catch (Exception ex) { AppLog.Write("storage", ex.Message); }
+    }
+
+    internal void ResetMonkeyTv()
+    {
+        DestroyBrowser();
+        try
+        {
+            StorageService.ResetMonkeyTvData();
+            _settings = new MonkeySettings();
+            _store.Save(_settings);
+            RenderHome();
+        }
+        catch (Exception ex) { AppLog.Write("storage", ex.Message); }
+    }
+
+    private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (_closing) return; _closing = true;
+        try { _store.Save(_settings); } catch (Exception ex) { AppLog.Write("shutdown", ex.Message); }
+        _serviceUiTimer.Stop();
+        try { _serviceControls.Close(); } catch { }
+        DestroyBrowser();
+        StorageService.ClearAllTemporaryData();
+        StorageService.CleanupQueuedSharedProfileDeletes();
+        StorageService.CleanupOrphanAssets(_settings);
+        SessionMarker.MarkClean();
+    }
+
+    internal void ToggleApplicationFullscreen() => SetApplicationFullscreen(!_appFullscreen);
+
+    private void SetApplicationFullscreen(bool value)
+    {
+        if (value == _appFullscreen) return;
+        _appFullscreen = value;
+        UpdateFullscreenShell();
+        _serviceControls.SetFullscreenState(_appFullscreen);
+        if (_webView is not null && !_websiteFullscreen) NoteServiceActivity(showControls: true);
+    }
+
+    private void SetWebsiteFullscreen(bool value)
+    {
+        if (value == _websiteFullscreen) return;
+        _websiteFullscreen = value;
+        if (value)
+        {
+            _serviceControls.HideOverlay(true);
+            RestoreCursor();
+        }
+        UpdateFullscreenShell();
+        if (!value && _webView is not null && BrowserView.Visibility == Visibility.Visible)
+            NoteServiceActivity(showControls: false);
+    }
+
+    private void UpdateFullscreenShell()
+    {
+        var shouldBeFullscreen = _appFullscreen || _websiteFullscreen;
+        if (shouldBeFullscreen && !_shellFullscreen)
+        {
+            _previousStyle = WindowStyle;
+            _previousState = WindowState;
+            _previousResizeMode = ResizeMode;
+            _previousTopmost = Topmost;
+            _previousBounds = WindowState == WindowState.Normal
+                ? new Rect(Left, Top, Width, Height)
+                : RestoreBounds;
+
+            var handle = new WindowInteropHelper(this).Handle;
+            var monitor = MonitorFromWindow(handle, MonitorDefaultToNearest);
+            var monitorInfo = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+            if (!GetMonitorInfo(monitor, ref monitorInfo))
+                monitorInfo.Monitor = new NativeRect { Left = 0, Top = 0, Right = (int)SystemParameters.PrimaryScreenWidth, Bottom = (int)SystemParameters.PrimaryScreenHeight };
+            var topLeft = ScreenPixelsToDip(new Point(monitorInfo.Monitor.Left, monitorInfo.Monitor.Top));
+            var bottomRight = ScreenPixelsToDip(new Point(monitorInfo.Monitor.Right, monitorInfo.Monitor.Bottom));
+
+            WindowState = WindowState.Normal;
+            WindowStyle = WindowStyle.None;
+            ResizeMode = ResizeMode.NoResize;
+            Topmost = true;
+            Left = topLeft.X; Top = topLeft.Y;
+            Width = bottomRight.X - topLeft.X; Height = bottomRight.Y - topLeft.Y;
+            _shellFullscreen = true;
+        }
+        else if (!shouldBeFullscreen && _shellFullscreen)
+        {
+            Topmost = _previousTopmost;
+            WindowStyle = _previousStyle;
+            ResizeMode = _previousResizeMode;
+            WindowState = WindowState.Normal;
+            Left = _previousBounds.Left; Top = _previousBounds.Top;
+            Width = _previousBounds.Width; Height = _previousBounds.Height;
+            if (_previousState == WindowState.Maximized) WindowState = WindowState.Maximized;
+            _shellFullscreen = false;
+        }
+        UpdateHomeChrome();
+        Dispatcher.BeginInvoke(PositionServiceControls);
+    }
+
+    private void Window_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (_webView is not null) NoteServiceActivity(showControls: false);
+    }
+
+    private void UpdateHomeChrome()
+    {
+        HomeHeader.Visibility = _shellFullscreen ? Visibility.Collapsed : Visibility.Visible;
+        HomeScroll.Padding = _shellFullscreen ? new Thickness(46, 38, 34, 42) : new Thickness(46, 8, 34, 42);
+    }
+
+    private void StartServiceUi()
+    {
+        GetCursorPos(out _lastPointerPosition);
+        _lastPointerActivity = DateTime.UtcNow;
+        RestoreCursor();
+        _serviceUiTimer.Start();
+        if (!_websiteFullscreen)
+        {
+            _serviceControls.ShowOverlay();
+            PositionServiceControls();
+        }
+    }
+
+    private void StopServiceUi()
+    {
+        _serviceUiTimer.Stop();
+        _serviceControls.HideOverlay(true);
+        RestoreCursor();
+    }
+
+    private void NoteServiceActivity(bool showControls)
+    {
+        _lastPointerActivity = DateTime.UtcNow;
+        RestoreCursor();
+        if (showControls && !_websiteFullscreen && BrowserView.Visibility == Visibility.Visible)
+        {
+            _serviceControls.ShowOverlay();
+            PositionServiceControls();
+        }
+    }
+
+    private void ServiceUiTimer_Tick(object? sender, EventArgs e)
+    {
+        if (_webView is null || BrowserView.Visibility != Visibility.Visible)
+        {
+            StopServiceUi();
+            return;
+        }
+
+        if (GetCursorPos(out var pointer) && (pointer.X != _lastPointerPosition.X || pointer.Y != _lastPointerPosition.Y))
+        {
+            _lastPointerPosition = pointer;
+            NoteServiceActivity(showControls: false);
+            if (!_websiteFullscreen && IsPointerInTopRevealZone(pointer))
+            {
+                _serviceControls.ShowOverlay();
+                PositionServiceControls();
+            }
+        }
+
+        var inactive = DateTime.UtcNow - _lastPointerActivity;
+        if (_websiteFullscreen)
+        {
+            if (inactive >= TimeSpan.FromSeconds(3)) HideCursor();
+            return;
+        }
+        if (_serviceControls.IsMouseOver)
+        {
+            _lastPointerActivity = DateTime.UtcNow;
+            RestoreCursor();
+            return;
+        }
+        if (inactive >= TimeSpan.FromSeconds(3))
+        {
+            _serviceControls.HideOverlay();
+            HideCursor();
+        }
+    }
+
+    private bool IsPointerInTopRevealZone(NativePoint pointer)
+    {
+        var topLeft = RootGrid.PointToScreen(new Point(0, 0));
+        var bottomRight = RootGrid.PointToScreen(new Point(RootGrid.ActualWidth, RootGrid.ActualHeight));
+        return pointer.X >= topLeft.X && pointer.X <= bottomRight.X &&
+               pointer.Y >= topLeft.Y && pointer.Y <= topLeft.Y + 24;
+    }
+
+    private void PositionServiceControls()
+    {
+        if (!_serviceControls.IsLoaded || BrowserView.Visibility != Visibility.Visible) return;
+        var screenPoint = RootGrid.PointToScreen(new Point(RootGrid.ActualWidth / 2, 0));
+        var dipPoint = ScreenPixelsToDip(screenPoint);
+        _serviceControls.Left = dipPoint.X - _serviceControls.Width / 2;
+        _serviceControls.Top = dipPoint.Y + 10;
+    }
+
+    private Point ScreenPixelsToDip(Point point)
+    {
+        var source = PresentationSource.FromVisual(this);
+        return source?.CompositionTarget?.TransformFromDevice.Transform(point) ?? point;
+    }
+
+    private void HideCursor()
+    {
+        if (_cursorHidden) return;
+        _cursorHidden = true;
+        Mouse.OverrideCursor = Cursors.None;
+        SetCursor(IntPtr.Zero);
+    }
+
+    private void RestoreCursor()
+    {
+        if (!_cursorHidden && Mouse.OverrideCursor is null) return;
+        _cursorHidden = false;
+        Mouse.OverrideCursor = null;
+    }
+
+    private const uint MonitorDefaultToNearest = 2;
+
+    [DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out NativePoint point);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SetCursor(IntPtr cursor);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint { public int X; public int Y; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRect { public int Left; public int Top; public int Right; public int Bottom; }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    private struct MonitorInfo { public int Size; public NativeRect Monitor; public NativeRect Work; public uint Flags; }
+}

@@ -1,0 +1,25 @@
+# Known limitations — v0.0.2-alpha
+
+- Streaming providers, logins, audio/video, subtitles, DRM, and provider fullscreen have not been account-tested. Provider policy may block embedded browsers even when Edge itself works. No bypass will be attempted.
+- The build relies on the WebView2 Evergreen Runtime installed on Windows.
+- Browser controls use a small auto-hiding owned flyout because same-window WPF content cannot safely overlay the standard WebView2 HWND. The composition alternative remains unsuitable because DRM-protected content can fail.
+- Automatic icons are best effort. Some sites block requests, omit icon metadata, return unsupported formats, or require JavaScript; manual replacement is available.
+- Automatic banner discovery is best effort and currently uses suitable Open Graph/Twitter landscape images exposed in initial HTML. Sites may provide marketing/content art instead of a clean logo, omit metadata, require JavaScript, or block the request; manual banner replacement is available.
+- New-window requests are redirected into the active WebView. Complex sign-in popups may behave differently from a full browser.
+- DevTools are disabled; the normal website context menu is enabled in this testing alpha.
+- Cursor auto-hide is based on service-view inactivity rather than video-playback detection. It is best effort and can vary while the HWND-hosted site has mouse capture or controls its own cursor.
+- Multi-monitor fullscreen uses the monitor containing Monkey TV and restores the prior bounds, but unusual mixed-DPI/display-topology changes made while fullscreen still need broader hardware testing.
+- Home uses WebView2's best-effort process suspension to preserve same-service page state. A website or runtime may still pause, reload, or alter playback state according to its own behavior.
+- TV Experience only requests a TV-oriented interface with a centralized smart-TV browser identity. Services may ignore it, return their normal interface, or reject the embedded environment.
+- Removing a service leaves its browser profile on disk to avoid silently destroying logins. Edit Service provides an explicit confirmed full site/browser-data clear, while the Home context menu only clears attributable disposable cache.
+- Navigation failures and WebView process failures use a Monkey TV error state when WebView2 reports them. Provider-rendered HTTP error pages or failures hidden inside site scripts cannot always be distinguished reliably.
+- Per-service storage is the size of each isolated WebView2 profile directory, not a domain-by-domain breakdown within a shared browser profile.
+- Storage categories are intentionally broad. WebView2 does not expose a reliable filesystem-level accounting API for every individual origin, so Monkey TV does not invent per-domain numbers. Shared-UDF runtime resources are reported as browser persistent/temporary data rather than assigned to a service.
+- Persistent cookies, IndexedDB, DRM state, and other provider-owned site data can still grow. Monkey TV removes known disposable caches but does not impose destructive quotas that could break login or playback.
+- Existing v0.0.1-alpha isolated profiles are retained rather than being manually moved to the new shared UDF, preserving legitimate sessions. They can retain duplicated WebView2 component data until the service is removed or browser data is cleared.
+- The 192 MiB temporary-cache budget is a soft safety threshold, not a strict Chromium quota. A live website can temporarily exceed it during one session; Monkey TV clears supported disk cache while active and performs filesystem cleanup once WebView2 is closed.
+- Monkey TV does not set a portable download directory or act as a download manager. Website-initiated downloads follow WebView2's normal save/download behavior outside Monkey TV's managed `Data` folder, so intentional user downloads are not silently deleted by cache cleanup.
+- Configuration backup restores launcher settings and artwork only. It intentionally does not restore streaming-service logins.
+- App-controlled paths are portable, but .NET single-file native extraction and the installed WebView2 Runtime use operating-system locations outside `Data`.
+- Portable profiles may include machine-bound authentication/DRM data and can require reauthentication after copying PCs.
+- There is no startup PIN, controller support, automatic updater, installer, crash-report submission, or provider-specific integration in this alpha. Update checking currently has architecture only and makes no network request.

@@ -1,0 +1,25 @@
+# Build and publish output
+[Bb]in/
+[Oo]bj/
+artifacts/
+builds/
+
+# Portable runtime data: may contain streaming profiles, cookies, DRM state, logs, and caches.
+Data/
+MonkeyTV/Data/
+MonkeyTV/**/Data/
+tests/**/Data/
+
+# IDE and local-only state
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Diagnostics and temporary files
+*.log
+*.tmp
+*.dmp
+*.crash
