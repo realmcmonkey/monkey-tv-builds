@@ -31,8 +31,8 @@ public static class StorageService
         "TrustTokenKeyCommitments", "OriginTrials", "MEIPreload", "extensions_crx_cache", "component_crx_cache"
     };
 
-    public const long TemporaryCacheBudgetBytes = 192L * 1024 * 1024;
-    public const long AbnormalTemporaryCacheBytes = 768L * 1024 * 1024;
+    public const long TemporaryCacheBudgetBytes = 100L * 1024 * 1024;
+    public const long AbnormalTemporaryCacheBytes = 256L * 1024 * 1024;
 
     public static long DirectorySize(string path)
     {

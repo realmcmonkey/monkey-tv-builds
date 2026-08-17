@@ -9,8 +9,8 @@ static void Require(bool condition, string message)
 
 PortablePaths.EnsureCreated();
 Require(App.DisplayVersion == "0.0.2-alpha", "Release version metadata is incorrect.");
-Require(App.BuildNumber == "2", "Build #2 metadata is incorrect.");
-Require(App.AlphaWarningKey == "0.0.2-alpha-build-2", "Alpha warning is not keyed to Build #2.");
+Require(App.BuildNumber == "3", "Build #3 metadata is incorrect.");
+Require(App.AlphaWarningKey == "0.0.2-alpha-build-3", "Alpha warning is not keyed to Build #3.");
 
 var legacyId = Guid.NewGuid();
 var legacyJson = $$"""

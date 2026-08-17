@@ -21,7 +21,8 @@
       <Button Style="{StaticResource OverlayButton}" Content="&#xE72B;" ToolTip="Back" Click="Back_Click"/>
       <Button Style="{StaticResource OverlayButton}" Content="&#xE72C;" ToolTip="Reload" Click="Reload_Click"/>
       <Border Width="1" Height="23" Background="#35FFFFFF" Margin="7,0" VerticalAlignment="Center"/>
-      <Button Style="{StaticResource OverlayButton}" Width="68" ToolTip="Return Home" Click="Home_Click">
+      <Button Style="{StaticResource OverlayButton}" Width="68" ToolTip="Return Home"
+              PreviewMouseLeftButtonUp="Home_PreviewMouseLeftButtonUp" Click="Home_Click">
         <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE80F;" FontFamily="Segoe MDL2 Assets" FontSize="15" Margin="0,0,7,0"/><TextBlock Text="Home" FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="12" FontWeight="SemiBold"/></StackPanel>
       </Button>
       <Border Width="1" Height="23" Background="#35FFFFFF" Margin="7,0" VerticalAlignment="Center"/>

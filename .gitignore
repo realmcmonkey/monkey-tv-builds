@@ -23,3 +23,6 @@ tests/**/Data/
 *.tmp
 *.dmp
 *.crash
+
+# Chat/session attachments are local inputs, never source or release content.
+.codex-remote-attachments/

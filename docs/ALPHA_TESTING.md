@@ -42,8 +42,14 @@ Test with a copy of the package and non-critical accounts. Back up `Data` before
 - [ ] Cursor hides after service-view inactivity, reappears on movement, and never remains hidden on Home, Settings, or dialogs.
 - [ ] Home from a fullscreen service leaves Monkey TV fullscreen; opening another service from fullscreen Home also stays fullscreen.
 - [ ] Service A -> Home -> service A resumes the same WebView and page state without navigating again.
-- [ ] Service A -> Home -> service B disposes A before creating and navigating B; A is not left hidden or running.
-- [ ] After switching away, reopening service A creates a fresh WebView while retaining legitimate profile/session data where supported.
+- [ ] Clicking the flyout Home button and pressing Ctrl+H both render Home immediately, silence audio immediately, and suspend the hidden WebView without an invalid-visible-controller error.
+- [ ] Reopening the same service resumes and unmutes it; a late suspension completion cannot leave the visible service silent or asleep.
+- [ ] Clicking Back/Reload/Home/fullscreen does not make the flyout vanish merely because its owned window received the click; inactivity still hides it repeatedly.
+- [ ] Service A -> Home -> service B immediately hides A, shows `Launching service B…`, and reveals the same WebView only after B's destination navigation completes.
+- [ ] Service A -> Home -> service A shows no launch transition and does not reload.
+- [ ] Rapidly superseding one launch with another does not surface the canceled destination's error against the new service.
+- [ ] An invalid destination changes from the launch transition to the clean Retry/Home error state; the transition cannot remain indefinitely.
+- [ ] The transition and its Home button work in normal and F11 fullscreen modes.
 - [ ] Disney+ -> Home -> YouTube TV, YouTube TV -> Home -> Paramount+, and Paramount+ -> Home -> Disney+ each load the selected URL.
 - [ ] Restart retains services and appearance.
 
@@ -67,7 +73,7 @@ Test with a copy of the package and non-critical accounts. Back up `Data` before
 - [ ] Reset Monkey TV requires confirmation and removes services, settings, artwork, profiles, and logins; setup returns on the next launch.
 - [ ] A new service uses `Data/Browser/Shared`; an existing legacy service still opens from `Data/Browser/Profiles` with its legitimate session preserved.
 - [ ] Removing an isolated legacy service deletes its now-abandoned profile. Removing a shared service queues only its exact recorded shared-profile folder for deletion at a safe startup/shutdown point.
-- [ ] After several service opens/switches/restarts, ordinary temporary data stays below the 192 MiB soft budget or is cleaned on the next safe cleanup point.
+- [ ] After several service opens/switches/restarts, ordinary temporary data stays near the 100 MiB soft target or is cleaned on Home/the next safe cleanup point.
 
 ## Manual provider/media testing
 

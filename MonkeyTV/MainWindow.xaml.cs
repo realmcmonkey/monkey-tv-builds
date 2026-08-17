@@ -11,6 +11,7 @@ using System.Windows.Threading;
 using System.Runtime.InteropServices;
 using System.Windows.Interop;
 using Microsoft.Win32;
+using System.Text.Json;
 
 namespace MonkeyTV;
 
@@ -21,6 +22,8 @@ public partial class MainWindow : Window
     private WebView2? _webView;
     private readonly DispatcherTimer _clockTimer;
     private readonly DispatcherTimer _serviceUiTimer;
+    private readonly DispatcherTimer _cacheBudgetTimer;
+    private readonly DispatcherTimer _launchTimeoutTimer;
     private readonly ServiceControlsWindow _serviceControls;
     private long _browserGeneration;
     private Guid? _activeServiceId;
@@ -39,6 +42,12 @@ public partial class MainWindow : Window
     private bool _browserProcessFailed;
     private bool _closing;
     private string? _defaultUserAgent;
+    private bool _launchTransitionActive;
+    private Guid? _launchServiceId;
+    private ulong? _launchNavigationId;
+    private long _homeSuspensionGeneration;
+    private bool _cacheBudgetCheckRunning;
+    private static readonly TimeSpan ServiceLaunchTimeout = TimeSpan.FromSeconds(45);
 
     public MainWindow(MonkeySettings settings, SettingsStore store)
     {
@@ -49,16 +58,26 @@ public partial class MainWindow : Window
         _serviceControls = new ServiceControlsWindow();
         _serviceControls.BackRequested += (_, _) => BrowserBack_Click(this, new RoutedEventArgs());
         _serviceControls.ReloadRequested += (_, _) => BrowserReload_Click(this, new RoutedEventArgs());
-        _serviceControls.HomeRequested += async (_, _) => await ReturnHomeAsync();
+        // Defer Home until the owned overlay's click route has completed. Hiding an owned
+        // no-activate window synchronously inside its own Button.Click can cancel the pointer
+        // route before WPF reliably transfers control back to the owner window.
+        _serviceControls.HomeRequested += (_, _) =>
+            Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() => _ = ReturnHomeAsync()));
         _serviceControls.FullscreenRequested += (_, _) => ToggleApplicationFullscreen();
         _serviceControls.UserActivity += (_, _) => NoteServiceActivity(showControls: true);
         _serviceUiTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(125) };
         _serviceUiTimer.Tick += ServiceUiTimer_Tick;
+        // A streaming page can add hundreds of megabytes without completing another top-level
+        // navigation. Check only every five minutes to keep disk-metadata activity negligible
+        // while enforcing the low-storage-oriented 100 MiB soft target during long sessions.
+        _cacheBudgetTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(5) };
+        _cacheBudgetTimer.Tick += CacheBudgetTimer_Tick;
+        _launchTimeoutTimer = new DispatcherTimer { Interval = ServiceLaunchTimeout };
+        _launchTimeoutTimer.Tick += LaunchTimeoutTimer_Tick;
         Loaded += (_, _) => _serviceControls.Owner = this;
         LocationChanged += (_, _) => PositionServiceControls();
         SizeChanged += (_, _) => PositionServiceControls();
         StateChanged += (_, _) => Dispatcher.BeginInvoke(PositionServiceControls);
-        Deactivated += (_, _) => { if (_webView is not null && !_websiteFullscreen) _serviceControls.HideOverlay(true); };
         Closing += MainWindow_Closing;
         Closed += (_, _) => Application.Current.Shutdown();
         RenderHome();
@@ -307,24 +326,42 @@ public partial class MainWindow : Window
     }
     private async Task OpenServiceAsync(ServiceDefinition service)
     {
+        // Any service selection supersedes a still-pending Home suspension request.
+        ++_homeSuspensionGeneration;
         if (_activeServiceId == service.Id && (_webView is not null || _isBrowserLaunching))
         {
             HomeView.Visibility = Visibility.Collapsed;
             BrowserView.Visibility = Visibility.Visible;
-            if (_webView?.CoreWebView2 is not null)
+            if (_launchTransitionActive || _isBrowserLaunching)
+            {
+                try { _webView?.CoreWebView2?.Resume(); } catch { }
+                if (_webView is not null) _webView.Visibility = Visibility.Collapsed;
+                LoadingOverlay.Visibility = Visibility.Visible;
+                ErrorOverlay.Visibility = Visibility.Collapsed;
+                StopServiceUi();
+            }
+            else if (ErrorOverlay.Visibility == Visibility.Visible)
+            {
+                if (_webView is not null) _webView.Visibility = Visibility.Collapsed;
+                LoadingOverlay.Visibility = Visibility.Collapsed;
+                StopServiceUi();
+            }
+            else if (_webView?.CoreWebView2 is not null)
             {
                 try { _webView.CoreWebView2.Resume(); } catch { }
+                SetBrowserMuted(_webView, false);
+                _webView.Visibility = Visibility.Visible;
+                _ = ResumeMediaPausedByHomeAsync(_webView);
                 LoadingOverlay.Visibility = Visibility.Collapsed;
+                ErrorOverlay.Visibility = Visibility.Collapsed;
+                StartServiceUi();
             }
-            StartServiceUi();
             return;
         }
 
         HomeView.Visibility = Visibility.Collapsed;
         BrowserView.Visibility = Visibility.Visible;
-        LoadingOverlay.Visibility = Visibility.Visible;
-        ErrorOverlay.Visibility = Visibility.Collapsed;
-        LoadingText.Text = $"Opening {service.Name}…";
+        BeginServiceLaunch(service);
 
         // Build #2 is a single-tab browser. A different service changes the destination of the
         // same hidden WebView instead of creating another WebView or profile.
@@ -333,9 +370,11 @@ public partial class MainWindow : Window
             _browserProcessFailed = false;
             _activeServiceId = service.Id;
             try { _webView.CoreWebView2.Resume(); } catch { }
+            // This is a genuine destination switch. Clear only WebView2's supported disposable
+            // disk cache before navigating the shared tab; same-service resume never comes here.
+            await StorageService.ClearActiveDiskCacheAsync(_webView.CoreWebView2.Profile);
             ApplyServiceSettings(_webView, service);
             _webView.CoreWebView2.Navigate(service.Url);
-            StartServiceUi();
             return;
         }
 
@@ -368,6 +407,7 @@ public partial class MainWindow : Window
             view.CoreWebView2.Settings.IsStatusBarEnabled = false;
             view.CoreWebView2.Settings.IsZoomControlEnabled = true;
             _defaultUserAgent = view.CoreWebView2.Settings.UserAgent;
+            SetBrowserMuted(view, true);
             // WPF WebView2 forwards accelerator keys into the WPF input route.
             view.PreviewKeyDown += (_, e) =>
             {
@@ -384,10 +424,11 @@ public partial class MainWindow : Window
                 }
             };
             view.CoreWebView2.NewWindowRequested += (_, e) => { e.Handled = true; view.CoreWebView2.Navigate(e.Uri); };
-            view.CoreWebView2.NavigationStarting += (_, _) => Dispatcher.Invoke(() =>
+            view.CoreWebView2.NavigationStarting += (_, e) => Dispatcher.Invoke(() =>
             {
                 if (generation != _browserGeneration || !ReferenceEquals(_webView, view)) return;
-                ErrorOverlay.Visibility = Visibility.Collapsed; LoadingOverlay.Visibility = Visibility.Visible;
+                if (_launchTransitionActive && _launchServiceId == _activeServiceId)
+                    _launchNavigationId = e.NavigationId;
             });
             view.CoreWebView2.ContainsFullScreenElementChanged += (_, _) => Dispatcher.Invoke(() =>
             {
@@ -397,24 +438,32 @@ public partial class MainWindow : Window
             view.NavigationCompleted += (_, e) =>
             {
                 if (generation != _browserGeneration || !ReferenceEquals(_webView, view)) return;
-                if (e.IsSuccess)
+                if (_launchTransitionActive)
                 {
-                    view.Visibility = Visibility.Visible; LoadingOverlay.Visibility = Visibility.Collapsed; ErrorOverlay.Visibility = Visibility.Collapsed;
-                    _ = EnforceActiveCacheBudgetAsync(view, generation);
+                    // A new service navigation cancels the previous top-level navigation. Ignore
+                    // that stale completion instead of showing its failure against the new service.
+                    if (_launchServiceId != _activeServiceId || _launchNavigationId != e.NavigationId) return;
+                    if (e.IsSuccess) CompleteServiceLaunch(view);
+                    else if (ActiveService is { } launchingService)
+                        ShowServiceError(launchingService, "Something went wrong while connecting to this service.", "WebView2 navigation status: " + e.WebErrorStatus);
+                    return;
                 }
-                else if (ActiveService is { } active)
+
+                if (!e.IsSuccess && BrowserView.Visibility == Visibility.Visible && ActiveService is { } active)
                     ShowServiceError(active, "Something went wrong while connecting to this service.", "WebView2 navigation status: " + e.WebErrorStatus);
+                else if (e.IsSuccess)
+                    _ = EnforceActiveCacheBudgetAsync(view, generation);
             };
             view.CoreWebView2.ProcessFailed += (_, e) => Dispatcher.Invoke(() =>
             {
                 if (generation != _browserGeneration || !ReferenceEquals(_webView, view)) return;
                 _browserProcessFailed = true;
-                ShowServiceError(service, "The browser process stopped unexpectedly.", "WebView2 process failure: " + e.ProcessFailedKind);
+                if (ActiveService is { } active)
+                    ShowServiceError(active, "The browser process stopped unexpectedly.", "WebView2 process failure: " + e.ProcessFailedKind);
             });
             ApplyServiceSettings(view, service);
             view.CoreWebView2.Navigate(service.Url);
             _isBrowserLaunching = false;
-            StartServiceUi();
         }
         catch (Exception ex)
         {
@@ -438,9 +487,76 @@ public partial class MainWindow : Window
         if (!string.IsNullOrWhiteSpace(userAgent)) view.CoreWebView2.Settings.UserAgent = userAgent;
     }
 
+    private void BeginServiceLaunch(ServiceDefinition service)
+    {
+        _launchTransitionActive = true;
+        _launchServiceId = service.Id;
+        _launchNavigationId = null;
+        _launchTimeoutTimer.Stop();
+        _launchTimeoutTimer.Start();
+        StopServiceUi();
+        SetBrowserMuted(_webView, true);
+        if (_webView is not null) _webView.Visibility = Visibility.Collapsed;
+        ErrorOverlay.Visibility = Visibility.Collapsed;
+        LoadingOverlay.Visibility = Visibility.Visible;
+        LoadingText.Text = $"Launching {service.Name}…";
+        SetLaunchArtwork(service);
+    }
+
+    private void SetLaunchArtwork(ServiceDefinition service)
+    {
+        LoadingArtwork.Source = null;
+        LoadingArtwork.Visibility = Visibility.Collapsed;
+        LoadingInitial.Text = string.IsNullOrWhiteSpace(service.Name) ? "?" : service.Name[..1].ToUpperInvariant();
+        LoadingInitial.Visibility = Visibility.Visible;
+
+        var artworkFile = ResolveAsset(service.BannerPath) ?? ResolveAsset(service.IconPath);
+        if (artworkFile is null || TryLoadImage(artworkFile) is not { } artwork) return;
+        LoadingArtwork.Source = artwork;
+        LoadingArtwork.Visibility = Visibility.Visible;
+        LoadingInitial.Visibility = Visibility.Collapsed;
+    }
+
+    private void CompleteServiceLaunch(WebView2 view)
+    {
+        EndServiceLaunchTransition();
+        LoadingOverlay.Visibility = Visibility.Collapsed;
+        ErrorOverlay.Visibility = Visibility.Collapsed;
+        _ = EnforceActiveCacheBudgetAsync(view, _browserGeneration);
+        if (BrowserView.Visibility == Visibility.Visible)
+        {
+            SetBrowserMuted(view, false);
+            view.Visibility = Visibility.Visible;
+            StartServiceUi();
+        }
+        else
+        {
+            SetBrowserMuted(view, true);
+            view.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void EndServiceLaunchTransition()
+    {
+        _launchTimeoutTimer.Stop();
+        _launchTransitionActive = false;
+        _launchServiceId = null;
+        _launchNavigationId = null;
+    }
+
+    private void LaunchTimeoutTimer_Tick(object? sender, EventArgs e)
+    {
+        _launchTimeoutTimer.Stop();
+        if (!_launchTransitionActive || ActiveService is not { } service) return;
+        try { _webView?.CoreWebView2?.Stop(); } catch { }
+        ShowServiceError(service, "This service took too long to respond.", "The initial navigation did not complete within 45 seconds.");
+    }
+
     private void ShowServiceError(ServiceDefinition service, string message, string details)
     {
+        EndServiceLaunchTransition();
         LoadingOverlay.Visibility = Visibility.Collapsed; ErrorOverlay.Visibility = Visibility.Visible;
+        SetBrowserMuted(_webView, true);
         if (_webView is not null) _webView.Visibility = Visibility.Collapsed;
         ErrorTitle.Text = $"Couldn't load {service.Name}"; ErrorMessage.Text = message; ErrorDetails.Text = details;
         AppLog.Write("browser", $"{service.Name}: {details}");
@@ -455,15 +571,26 @@ public partial class MainWindow : Window
         await StorageService.ClearActiveDiskCacheAsync(view.CoreWebView2?.Profile);
     }
 
+    private async void CacheBudgetTimer_Tick(object? sender, EventArgs e)
+    {
+        if (_cacheBudgetCheckRunning || BrowserView.Visibility != Visibility.Visible ||
+            _webView?.CoreWebView2 is null) return;
+
+        _cacheBudgetCheckRunning = true;
+        try { await EnforceActiveCacheBudgetAsync(_webView, _browserGeneration); }
+        finally { _cacheBudgetCheckRunning = false; }
+    }
+
     private async void RetryService_Click(object sender, RoutedEventArgs e)
     {
         if (_activeServiceId is not { } id || _settings.Services.FirstOrDefault(s => s.Id == id) is not { } service) { await ReturnHomeAsync(); return; }
-        ErrorOverlay.Visibility = Visibility.Collapsed; LoadingOverlay.Visibility = Visibility.Visible;
         if (_browserProcessFailed || _webView?.CoreWebView2 is null)
         {
             DestroyBrowser(); await OpenServiceAsync(service); return;
         }
-        StartServiceUi(); _webView.CoreWebView2.Navigate(service.Url);
+        BeginServiceLaunch(service);
+        ApplyServiceSettings(_webView, service);
+        _webView.CoreWebView2.Navigate(service.Url);
     }
 
     private void DestroyBrowser()
@@ -472,6 +599,7 @@ public partial class MainWindow : Window
         _isBrowserLaunching = false;
         _activeServiceId = null;
         _browserProcessFailed = false;
+        EndServiceLaunchTransition();
         StopServiceUi();
         SetWebsiteFullscreen(false);
         var view = _webView; _webView = null;
@@ -503,13 +631,133 @@ public partial class MainWindow : Window
 
     private async Task ReturnHomeAsync()
     {
+        var suspensionGeneration = ++_homeSuspensionGeneration;
+        var view = _webView;
+
+        // Audio must stop and Home must render synchronously with the click/shortcut. WebView2
+        // requires its controller to be invisible before TrySuspendAsync, so suspension follows
+        // the visual state change rather than blocking it.
         StopServiceUi();
-        if (_webView?.CoreWebView2 is not null)
-        {
-            try { await _webView.CoreWebView2.TrySuspendAsync(); } catch { }
-        }
-        BrowserView.Visibility = Visibility.Collapsed; HomeView.Visibility = Visibility.Visible; RenderHome();
+        SetBrowserMuted(view, true);
+        if (view is not null) view.Visibility = Visibility.Collapsed;
+        BrowserView.Visibility = Visibility.Collapsed;
+        HomeView.Visibility = Visibility.Visible;
+        RenderHome();
         UpdateHomeChrome();
+
+        if (view?.CoreWebView2 is null) return;
+        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+        if (suspensionGeneration != _homeSuspensionGeneration || !ReferenceEquals(view, _webView)) return;
+
+        try
+        {
+            // Standard finite-duration HTML media is paused so reopening this service can resume
+            // from the same position. A clearly live stream (duration === Infinity) stays alive
+            // and muted instead of being suspended, allowing the provider to maintain live state.
+            var liveMediaDetected = await PauseOnDemandMediaAsync(view);
+            if (suspensionGeneration != _homeSuspensionGeneration ||
+                !ReferenceEquals(view, _webView) || BrowserView.Visibility == Visibility.Visible) return;
+            if (liveMediaDetected) return;
+
+            var suspended = false;
+            for (var attempt = 0; attempt < 3 && !suspended; attempt++)
+            {
+                suspended = await view.CoreWebView2.TrySuspendAsync();
+                if (suspended || suspensionGeneration != _homeSuspensionGeneration ||
+                    !ReferenceEquals(view, _webView) || BrowserView.Visibility == Visibility.Visible) break;
+                await Task.Delay(250);
+            }
+            if (!suspended && suspensionGeneration == _homeSuspensionGeneration)
+                AppLog.Write("browser", "The hidden WebView declined its best-effort suspension; audio remains muted.");
+        }
+        catch (Exception ex)
+        {
+            if (suspensionGeneration == _homeSuspensionGeneration)
+                AppLog.Write("browser", "Could not suspend the hidden WebView: " + ex.Message);
+        }
+        finally
+        {
+            // If the user reopened a service while suspension was in flight, ensure the late
+            // completion cannot leave the now-visible page asleep or muted.
+            if (suspensionGeneration != _homeSuspensionGeneration &&
+                ReferenceEquals(view, _webView) && BrowserView.Visibility == Visibility.Visible)
+            {
+                try { view.CoreWebView2.Resume(); } catch { }
+                SetBrowserMuted(view, false);
+                _ = ResumeMediaPausedByHomeAsync(view);
+            }
+        }
+    }
+
+    private static async Task<bool> PauseOnDemandMediaAsync(WebView2 view)
+    {
+        if (view.CoreWebView2 is null) return false;
+        const string script = """
+            (() => {
+              try {
+                const media = [];
+                const collect = doc => {
+                  if (!doc) return;
+                  media.push(...doc.querySelectorAll('video,audio'));
+                  for (const frame of doc.querySelectorAll('iframe')) {
+                    try { collect(frame.contentDocument); } catch { }
+                  }
+                };
+                collect(document);
+                const live = media.some(item => item.readyState > 0 && item.duration === Infinity);
+                if (live) return 'live';
+                for (const item of media) {
+                  if (!item.paused && !item.ended) {
+                    item.__monkeyTvPausedByHome = true;
+                    item.pause();
+                  }
+                }
+                return 'on-demand';
+              } catch { return 'unknown'; }
+            })()
+            """;
+        try
+        {
+            var result = await view.CoreWebView2.ExecuteScriptAsync(script);
+            return string.Equals(JsonSerializer.Deserialize<string>(result), "live", StringComparison.Ordinal);
+        }
+        catch { return false; }
+    }
+
+    private static async Task ResumeMediaPausedByHomeAsync(WebView2 view)
+    {
+        if (view.CoreWebView2 is null) return;
+        const string script = """
+            (() => {
+              try {
+                const media = [];
+                const collect = doc => {
+                  if (!doc) return;
+                  media.push(...doc.querySelectorAll('video,audio'));
+                  for (const frame of doc.querySelectorAll('iframe')) {
+                    try { collect(frame.contentDocument); } catch { }
+                  }
+                };
+                collect(document);
+                for (const item of media) {
+                  if (item.__monkeyTvPausedByHome) {
+                    item.__monkeyTvPausedByHome = false;
+                    item.play().catch(() => {});
+                  }
+                }
+              } catch { }
+            })()
+            """;
+        try { await view.CoreWebView2.ExecuteScriptAsync(script); } catch { }
+    }
+
+    private static void SetBrowserMuted(WebView2? view, bool muted)
+    {
+        try
+        {
+            if (view?.CoreWebView2 is not null) view.CoreWebView2.IsMuted = muted;
+        }
+        catch { }
     }
 
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e) { if (IsLoaded) RenderHome(); }
@@ -703,6 +951,7 @@ public partial class MainWindow : Window
         _lastPointerActivity = DateTime.UtcNow;
         RestoreCursor();
         _serviceUiTimer.Start();
+        _cacheBudgetTimer.Start();
         if (!_websiteFullscreen)
         {
             _serviceControls.ShowOverlay();
@@ -713,6 +962,7 @@ public partial class MainWindow : Window
     private void StopServiceUi()
     {
         _serviceUiTimer.Stop();
+        _cacheBudgetTimer.Stop();
         _serviceControls.HideOverlay(true);
         RestoreCursor();
     }

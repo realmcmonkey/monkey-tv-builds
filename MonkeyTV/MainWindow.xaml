@@ -112,9 +112,17 @@
       </Border>
       <Grid x:Name="BrowserHost"/>
       <Border x:Name="LoadingOverlay" Background="#FF101116">
-        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-          <ProgressBar IsIndeterminate="True" Width="220" Height="4" Foreground="#FF7C5CFC"/>
-          <TextBlock x:Name="LoadingText" Text="Opening service…" FontSize="17" Margin="0,20,0,0" HorizontalAlignment="Center"/>
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="360">
+          <Border Width="240" Height="135" CornerRadius="20" Background="#FF1C1D24" BorderBrush="#22FFFFFF" BorderThickness="1" ClipToBounds="True">
+            <Border.Effect><DropShadowEffect Color="#FF000000" BlurRadius="28" ShadowDepth="7" Opacity="0.32"/></Border.Effect>
+            <Grid>
+              <Image x:Name="LoadingArtwork" Stretch="Uniform" Margin="14" Visibility="Collapsed"/>
+              <TextBlock x:Name="LoadingInitial" Text="M" FontSize="42" FontWeight="SemiBold" Foreground="#FFD9D0FF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Grid>
+          </Border>
+          <TextBlock x:Name="LoadingText" Text="Launching service…" FontSize="19" FontWeight="SemiBold" Margin="0,24,0,0" HorizontalAlignment="Center"/>
+          <ProgressBar IsIndeterminate="True" Width="128" Height="3" Foreground="#FF7C5CFC" Background="#332D2F38" Margin="0,18,0,0"/>
+          <Button Content="Home" Click="BrowserHome_Click" Padding="15,8" Margin="0,22,0,0" HorizontalAlignment="Center" ToolTip="Return to Monkey TV Home"/>
         </StackPanel>
       </Border>
       <Border x:Name="ErrorOverlay" Visibility="Collapsed" Background="#FF101116">

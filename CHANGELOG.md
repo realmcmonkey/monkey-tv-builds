@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.0.2-alpha — Build #3
+
+- Added a native launch transition when switching services so the previous website is hidden immediately while the shared WebView navigates; failed or stuck launches flow into Monkey TV's existing Retry/Home error state.
+- Fixed the auto-hiding service overlay and strengthened its Home control for mouse and accessibility activation.
+- Home now immediately mutes and hides the active service. Standard on-demand HTML media is paused and marked for automatic same-service resume; clearly detectable live media stays active but muted so its provider can maintain live position.
+- Preserved same-service page state and cache when returning from Home. Switching to a different service clears supported disposable disk cache before navigating the shared WebView.
+- Changed temporary-browser-data control to a 100 MiB soft target checked every five minutes. Checks read file metadata only; cleanup uses WebView2's supported disk-cache API and preserves cookies, site storage, logins, and protected provider state.
+- Expanded lifecycle test coverage and documentation for launch transitions, Home suspension, cache behavior, and limitations of generic live-player detection.
+
 ## v0.0.2-alpha — Build #2
 
 - Changed service viewing to one reusable WebView2 and one shared persistent browser profile for all services; same-service Home resumes the existing page, while a different service reuses that WebView and navigates to its destination.
