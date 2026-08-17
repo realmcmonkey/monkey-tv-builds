@@ -21,7 +21,9 @@ public partial class App : Application
         {
             const string marker = "+build.";
             var index = InformationalVersion.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-            return index >= 0 ? InformationalVersion[(index + marker.Length)..] : "0";
+            return index >= 0
+                ? InformationalVersion[(index + marker.Length)..].Split('.')[0]
+                : "0";
         }
     }
 
