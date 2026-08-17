@@ -2,7 +2,7 @@
 
 Monkey TV is a portable Windows streaming-service launcher. It opens one configured website at a time in one reusable Microsoft Edge WebView2. Home immediately mutes and hides the active service, then suspends it so the same service can resume where it was left; choosing a different service hides that WebView behind a launch transition and navigates the same instance to the new destination. It does not host, download, proxy, capture, decrypt, or modify streaming content.
 
-Current version: **v0.0.2-alpha — Build #2**
+Current version: **v0.0.3-alpha — Build #1**
 
 ## Try the packaged alpha
 
@@ -13,11 +13,13 @@ The Microsoft Edge WebView2 Evergreen Runtime must be installed. It is normally 
 ## What works in this alpha
 
 - Version-aware alpha warning and per-version dismissal
+- Fast theme-aware startup splash; no browser or service is initialized on Home
 - Three-screen first-time setup
 - Generic services using name + URL
 - Best-effort website icon discovery and manual icon replacement
 - Configurable tile size, names, and clock
 - Responsive Banner/Square Home cards with Small/Medium/Large sizing
+- System/Light/Dark themes, restrained accent choices, and remembered safe on-screen window placement
 - Subtle expandable configured-service name search
 - Cached landscape artwork discovery and portable manual banner overrides
 - Add, edit, remove, and reorder services
@@ -29,6 +31,8 @@ The Microsoft Edge WebView2 Evergreen Runtime must be installed. It is normally 
 - Same-service Home resume; different services reuse the same WebView and navigate it to the new destination
 - Local-artwork launch transition hides the previous website until a different service finishes its initial navigation
 - Friendly navigation/process-failure screens with Retry and Home
+- Controlled same-profile sign-in popups, deliberate external-link routing, session-only permission prompts, and Windows Save dialogs for website downloads
+- Browser zoom locked to the normal 100% service-view scale
 - Portable configuration export/import that excludes logins and browser profiles
 - On-demand Settings storage reporting, bounded logs, unclean-shutdown recovery, and a diagnostic About page
 - Storage management with safe temporary-data cleanup, a low-storage-oriented 100 MiB soft cache target, destructive browser-data reset, and full Monkey TV reset

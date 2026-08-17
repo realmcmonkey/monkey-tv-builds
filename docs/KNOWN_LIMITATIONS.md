@@ -1,11 +1,11 @@
-# Known limitations — v0.0.2-alpha
+# Known limitations — v0.0.3-alpha
 
 - Streaming providers, logins, audio/video, subtitles, DRM, and provider fullscreen have not been account-tested. Provider policy may block embedded browsers even when Edge itself works. No bypass will be attempted.
 - The build relies on the WebView2 Evergreen Runtime installed on Windows.
 - Browser controls use a small auto-hiding owned flyout because same-window WPF content cannot safely overlay the standard WebView2 HWND. The composition alternative remains unsuitable because DRM-protected content can fail.
 - Automatic icons are best effort. Some sites block requests, omit icon metadata, return unsupported formats, or require JavaScript; manual replacement is available.
 - Automatic banner discovery is best effort and currently uses suitable Open Graph/Twitter landscape images exposed in initial HTML. Sites may provide marketing/content art instead of a clean logo, omit metadata, require JavaScript, or block the request; manual banner replacement is available.
-- New-window requests are redirected into the active WebView. Complex sign-in popups may behave differently from a full browser.
+- User-initiated related/auth new-window requests use one temporary child WebView sharing the main profile; one child is allowed at a time and it is never a permanent tab. Unrelated user-initiated popup links open in the Windows default browser. Generic domain/auth heuristics cannot identify every provider flow, so unusual legitimate flows can still require the default browser or fail.
 - DevTools are disabled; the normal website context menu is enabled in this testing alpha.
 - Cursor auto-hide is based on service-view inactivity rather than video-playback detection. It is best effort and can vary while the HWND-hosted site has mouse capture or controls its own cursor.
 - Multi-monitor fullscreen uses the monitor containing Monkey TV and restores the prior bounds, but unusual mixed-DPI/display-topology changes made while fullscreen still need broader hardware testing.
@@ -19,7 +19,8 @@
 - Live/on-demand detection uses standard HTML media state. Providers using inaccessible cross-origin frames, closed shadow DOM, or custom/protected player internals may not expose enough information; those pages are muted and use WebView2's best-effort suspension fallback. A provider may also reject automatic `play()` on resume under its own autoplay policy.
 - Existing v0.0.1 and Build #1 profiles are retained rather than being manually merged into the unified profile. Their sessions are preserved on disk but are not used by Build #2, so providers can require a one-time login again. Retained data can remain until the service is removed or browser data is cleared.
 - The 100 MiB temporary-cache target is not a strict Chromium quota. A live website can exceed it between five-minute checks during navigation or streaming. Monkey TV clears supported disk cache when the target is exceeded or before switching to a different service, and performs broader filesystem cleanup once WebView2 is closed. Returning Home or resuming the same service does not clear it.
-- Monkey TV does not set a portable download directory or act as a download manager. Website-initiated downloads follow WebView2's normal save/download behavior outside Monkey TV's managed `Data` folder, so intentional user downloads are not silently deleted by cache cleanup.
+- Monkey TV does not act as a download manager. Website-initiated downloads use a Windows Save dialog outside Monkey TV's managed `Data` folder; canceling leaves no app-owned download artifact.
+- Camera, microphone, location, and clipboard decisions are prompted per request and are not persisted by Monkey TV. Notifications and unsupported privileged requests are denied. Real providers may require additional permission behavior that still needs manual testing.
 - Configuration backup restores launcher settings and artwork only. It intentionally does not restore streaming-service logins.
 - App-controlled paths are portable, but .NET single-file native extraction and the installed WebView2 Runtime use operating-system locations outside `Data`.
 - Portable profiles may include machine-bound authentication/DRM data and can require reauthentication after copying PCs.

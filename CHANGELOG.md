@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.0.3-alpha — Build #1
+
+- Added a fast Fluent-inspired startup splash and kept startup provider-free: no WebView, service navigation, or provider contact occurs until a service is selected.
+- Added persisted normal/maximized window placement with disconnected-monitor recovery and improved smaller-window Settings/Home layout.
+- Added System, Light, and Dark themes plus restrained accent choices across Monkey TV UI; replaced the shared ComboBox template to fix unreadable closed and open dropdown text.
+- Polished service launch/error/shutdown surfaces for the selected theme and restored a visible `Shutting down Monkey TV…` state during asynchronous cleanup.
+- Added controlled, same-profile temporary WebView2 windows for user-initiated related/auth popups; unrelated user-initiated popup links open in the Windows default browser rather than becoming tabs.
+- Added conservative session-only camera, microphone, location, and clipboard permission prompts; notifications and unrelated privileged requests are denied, while autoplay remains available for streaming.
+- Added explicit website download handling through the Windows Save dialog outside portable `Data`, and prevented persistent accidental browser zoom.
+- Preserved the single service WebView/profile, same-service resume, different-service transition, cache lifecycle, fullscreen, and portable storage architecture.
+
+Known alpha limitations: real provider authentication/popup behavior, protected playback, website fullscreen, and permission requirements still need manual account testing. Domain/auth routing is intentionally conservative and may send an unusual legitimate external flow to the default browser.
+
 ## v0.0.2-alpha — Build #3
 
 - Added a native launch transition when switching services so the previous website is hidden immediately while the shared WebView navigates; failed or stuck launches flow into Monkey TV's existing Retry/Home error state.

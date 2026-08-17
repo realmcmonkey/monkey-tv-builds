@@ -12,14 +12,17 @@ public partial class SettingsWindow : Window
 {
     private MonkeySettings _settings;
     private readonly SettingsStore _store;
+    private bool _appearanceReady;
+    private bool _appearanceSaved;
 
     public SettingsWindow(MonkeySettings settings, SettingsStore store)
     {
         InitializeComponent(); _settings = settings; _store = store;
         CardStyleBox.SelectedIndex = (int)_settings.CardStyle; TileSizeBox.SelectedIndex = (int)_settings.TileSize;
+        ThemeBox.SelectedIndex = (int)_settings.Theme; AccentBox.SelectedIndex = (int)_settings.Accent;
         ShowNamesCheck.IsChecked = _settings.ShowServiceNames; ShowClockCheck.IsChecked = _settings.ShowClock;
         AboutVersionText.Text = $"Version v{App.DisplayVersion} — Build #{App.BuildNumber}";
-        RefreshList(); RefreshAbout();
+        RefreshList(); RefreshAbout(); _appearanceReady = true;
     }
 
     private void ShowPage(FrameworkElement page)
@@ -90,8 +93,23 @@ public partial class SettingsWindow : Window
     private void SaveAppearance_Click(object sender, RoutedEventArgs e)
     {
         _settings.CardStyle = (ServiceCardStyle)Math.Max(0, CardStyleBox.SelectedIndex); _settings.TileSize = (TileSize)Math.Max(0, TileSizeBox.SelectedIndex);
+        _settings.Theme = (AppTheme)Math.Max(0, ThemeBox.SelectedIndex); _settings.Accent = (AppAccent)Math.Max(0, AccentBox.SelectedIndex);
         _settings.ShowServiceNames = ShowNamesCheck.IsChecked == true; _settings.ShowClock = ShowClockCheck.IsChecked == true; _store.Save(_settings);
+        ThemeService.Apply(_settings);
+        _appearanceSaved = true;
         Close();
+    }
+
+    private void AppearancePreview_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_appearanceReady) return;
+        var preview = new MonkeySettings { Theme = (AppTheme)Math.Max(0, ThemeBox.SelectedIndex), Accent = (AppAccent)Math.Max(0, AccentBox.SelectedIndex) };
+        ThemeService.Apply(preview);
+    }
+
+    private void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (!_appearanceSaved) ThemeService.Apply(_settings);
     }
 
     private void RefreshStorage_Click(object sender, RoutedEventArgs e) => RefreshStorage();
@@ -149,6 +167,7 @@ public partial class SettingsWindow : Window
             (Owner as MainWindow)?.PrepareForConfigurationImport();
             _settings = BackupService.Import(preview, _store); RefreshList();
             CardStyleBox.SelectedIndex = (int)_settings.CardStyle; TileSizeBox.SelectedIndex = (int)_settings.TileSize;
+            ThemeBox.SelectedIndex = (int)_settings.Theme; AccentBox.SelectedIndex = (int)_settings.Accent; ThemeService.Apply(_settings);
             ShowNamesCheck.IsChecked = _settings.ShowServiceNames; ShowClockCheck.IsChecked = _settings.ShowClock;
             BackupStatus.Text = "Configuration imported. Streaming-service logins were not changed.";
         }
@@ -158,7 +177,7 @@ public partial class SettingsWindow : Window
     private void RefreshAbout()
     {
         string webView; try { webView = CoreWebView2Environment.GetAvailableBrowserVersionString(); } catch { webView = "Not detected"; }
-        RuntimeText.Text = $"WebView2 Runtime: {webView}\n.NET: {RuntimeInformation.FrameworkDescription}\nWindows: {Environment.OSVersion.VersionString}\nArchitecture: {RuntimeInformation.ProcessArchitecture}";
+        RuntimeText.Text = $"WebView2 Runtime: {webView}\n.NET: {RuntimeInformation.FrameworkDescription}\nWindows: {Environment.OSVersion.VersionString}\nArchitecture: {RuntimeInformation.ProcessArchitecture}\nHome ready after: {App.LastStartupMilliseconds} ms";
         AboutStorageText.Text = $"Portable Data: {PortablePaths.DataRoot}\nCurrent size: {StorageService.FormatBytes(StorageService.DirectorySize(PortablePaths.DataRoot))}";
     }
 

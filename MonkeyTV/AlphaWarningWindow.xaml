@@ -3,12 +3,12 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Monkey TV" Width="510" Height="340" WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize" WindowStyle="None" AllowsTransparency="True" Background="Transparent">
-  <Border Background="#FA1B1C22" CornerRadius="18" BorderBrush="#553F414B" BorderThickness="1" Padding="32">
+  <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="18" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="32">
     <Border.Effect><DropShadowEffect BlurRadius="28" ShadowDepth="8" Opacity="0.45" /></Border.Effect>
     <Grid>
       <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
       <StackPanel>
-        <Border Width="46" Height="46" CornerRadius="12" Background="#FF7C5CFC" HorizontalAlignment="Left">
+        <Border Width="46" Height="46" CornerRadius="12" Background="{DynamicResource AccentBrush}" HorizontalAlignment="Left">
           <TextBlock Text="M" FontSize="23" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
         </Border>
         <TextBlock x:Name="VersionText" Margin="0,20,0,0" FontSize="24" FontWeight="SemiBold"/>

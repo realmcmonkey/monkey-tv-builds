@@ -2,10 +2,10 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Set up Monkey TV" Width="850" Height="620" WindowStartupLocation="CenterScreen"
-        MinWidth="760" MinHeight="560" Background="#FF121318">
+        MinWidth="760" MinHeight="560" Background="{DynamicResource BackgroundBrush}">
   <Grid>
     <Grid.ColumnDefinitions><ColumnDefinition Width="210"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-    <Border Background="#FF191A20" Padding="28">
+    <Border Background="{DynamicResource SurfaceBrush}" Padding="28">
       <StackPanel>
         <TextBlock Text="Monkey TV" FontSize="22" FontWeight="SemiBold" Margin="0,4,0,38"/>
         <TextBlock x:Name="Step1Label" Text="1   Add services" FontSize="15" Margin="0,0,0,22"/>
@@ -20,7 +20,7 @@
           <TextBlock Text="Add your services" FontSize="30" FontWeight="SemiBold"/>
           <TextBlock Text="Add any streaming website you use. Nothing is loaded until you choose it from Home." Foreground="{StaticResource MutedBrush}" Margin="0,9,0,26" TextWrapping="Wrap"/>
         </StackPanel>
-        <ListBox x:Name="SetupServicesList" Grid.Row="1" Background="Transparent" BorderThickness="0" Foreground="White" FontSize="15"/>
+        <ListBox x:Name="SetupServicesList" Grid.Row="1" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource TextBrush}" FontSize="15"/>
         <Grid Grid.Row="2">
           <Button Content="Add service" Click="AddService_Click" HorizontalAlignment="Left"/>
           <Button Style="{StaticResource AccentButton}" Content="Done" Click="ServicesDone_Click" HorizontalAlignment="Right" MinWidth="105"/>
@@ -54,7 +54,7 @@
       </Grid>
       <Grid x:Name="FinishStep" Visibility="Collapsed">
         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Width="400">
-          <Border Width="68" Height="68" Background="#FF7C5CFC" CornerRadius="34">
+          <Border Width="68" Height="68" Background="{DynamicResource AccentBrush}" CornerRadius="34">
             <TextBlock Text="✓" FontSize="32" HorizontalAlignment="Center" VerticalAlignment="Center"/>
           </Border>
           <TextBlock Text="Setup complete" FontSize="30" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,22,0,10"/>

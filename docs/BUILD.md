@@ -26,7 +26,7 @@ The project enables compressed single-file publishing and embeds managed/native 
 
 ## Size trade-off
 
-The self-contained portable build intentionally includes the .NET 8 Windows Desktop runtime. In the current local measurement this produces a 78,135,008-byte EXE (about 74.5 MiB); the majority is the .NET/WPF/Windows SDK runtime, not Monkey TV code or WebView2 (which relies on the installed Evergreen Runtime). WPF is not supported or recommended with .NET trimming, so trimming is not enabled.
+The self-contained portable build intentionally includes the .NET 8 Windows Desktop runtime. The v0.0.3-alpha Build #1 local release measurement is 78,179,732 bytes (about 74.56 MiB); the majority is the .NET/WPF/Windows SDK runtime, not Monkey TV code or WebView2 (which relies on the installed Evergreen Runtime). WPF is not supported or recommended with .NET trimming, so trimming is not enabled.
 
 A local framework-dependent single-file experiment measured about 24.4 MiB, but requires the matching .NET 8 Windows Desktop Runtime on the target PC. It is not the default portable build because that extra prerequisite weakens copy-to-another-PC reliability. Do not change the default distribution model without explicit user approval.
 

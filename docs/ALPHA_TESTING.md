@@ -4,7 +4,8 @@ Test with a copy of the package and non-critical accounts. Back up `Data` before
 
 ## Shell and setup
 
-- [ ] Fresh launch shows `Monkey TV v0.0.2-alpha` before setup.
+- [ ] Launch immediately shows the Monkey TV splash, then `Monkey TV v0.0.3-alpha`; the splash disappears as soon as Home is ready.
+- [ ] Startup creates no service WebView and makes no provider request before a service is clicked.
 - [ ] Continue works; per-version suppression works after restart.
 - [ ] Setup adds one service, Add More works repeatedly, and Done advances.
 - [ ] Tile size, names, and clock settings appear correctly.
@@ -12,6 +13,9 @@ Test with a copy of the package and non-critical accounts. Back up `Data` before
 - [ ] Every configured launch and every crash-recovery launch returns to Home; no service is reopened automatically.
 - [ ] F11 enters true borderless app fullscreen with no title/header strip; Escape exits it; the prior normal/maximized bounds restore.
 - [ ] F11 works from Home, Settings, and a focused service without triggering a website command.
+- [ ] Normal bounds and maximized state restore after restart; stale/off-screen coordinates recover to an available display; F11 state is never persisted.
+- [ ] System, Light, and Dark themes plus every accent render Home, Settings, setup, launch, error, and shutdown surfaces readably.
+- [ ] Closed ComboBox values and open normal/hovered/selected/disabled items remain readable in Light and Dark modes.
 
 ## Services and portability
 
@@ -38,6 +42,10 @@ Test with a copy of the package and non-critical accounts. Back up `Data` before
 - [ ] No `msedgewebview2` service page is created while sitting on Home.
 - [ ] Clicking a service creates and navigates the WebView.
 - [ ] Site interaction, links, Back, and Reload work.
+- [ ] A same-service/auth `window.open` flow opens one temporary child using the shared profile and closes cleanly; unrelated user-initiated popup links open in the default browser.
+- [ ] Camera/microphone/location/clipboard requests show an allow-once prompt, notification permission is not automatically enabled, and decisions do not add an app permission database.
+- [ ] A website attachment opens a Windows Save dialog outside `Data`; canceling creates no portable download residue.
+- [ ] Ctrl+Plus, Ctrl+Minus, Ctrl+0, and Ctrl+mouse-wheel do not leave a service at a persistent non-default zoom.
 - [ ] Service controls appear briefly, hide after inactivity, and reliably reveal at the top edge without blocking normal page clicks.
 - [ ] Cursor hides after service-view inactivity, reappears on movement, and never remains hidden on Home, Settings, or dialogs.
 - [ ] Home from a fullscreen service leaves Monkey TV fullscreen; opening another service from fullscreen Home also stays fullscreen.

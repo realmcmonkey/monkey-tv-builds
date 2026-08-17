@@ -1,11 +1,14 @@
 using System.Reflection;
+using System.Diagnostics;
 using System.Windows;
+using System.Windows.Threading;
 
 namespace MonkeyTV;
 
 public partial class App : Application
 {
-    private const string FallbackVersion = "0.0.2-alpha";
+    private const string FallbackVersion = "0.0.3-alpha";
+    internal static long LastStartupMilliseconds { get; private set; }
 
     private static string InformationalVersion => Assembly.GetExecutingAssembly()
         .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? FallbackVersion;
@@ -33,14 +36,20 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        var startup = Stopwatch.StartNew();
+        SplashWindow? splash = null;
         try
         {
+            splash = new SplashWindow();
+            splash.Show();
+            Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
             PortablePaths.EnsureCreated();
             StorageService.CleanupQueuedSharedProfileDeletes();
             var recoveredFromUncleanExit = SessionMarker.Begin();
             StorageService.ClearAllTemporaryData();
             var store = new SettingsStore();
             var settings = store.Load();
+            ThemeService.Initialize(settings);
 
             if (!string.Equals(settings.DismissedAlphaVersion, AlphaWarningKey, StringComparison.OrdinalIgnoreCase))
             {
@@ -65,11 +74,23 @@ public partial class App : Application
 
             var main = new MainWindow(settings, store);
             MainWindow = main;
+            WindowPlacementService.Restore(main, settings);
+            main.ContentRendered += (_, _) =>
+            {
+                if (splash is not null)
+                {
+                    splash.Close();
+                    splash = null;
+                }
+                startup.Stop();
+                LastStartupMilliseconds = startup.ElapsedMilliseconds;
+            };
             main.Show();
         }
         catch (Exception ex)
         {
             AppLog.Write("startup", ex.ToString());
+            splash?.Close();
             System.Windows.MessageBox.Show("Monkey TV could not start. A small diagnostic entry was saved in Data\\Logs.", "Monkey TV");
             Shutdown();
         }
@@ -77,6 +98,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        ThemeService.Shutdown();
         SessionMarker.MarkClean();
         base.OnExit(e);
     }

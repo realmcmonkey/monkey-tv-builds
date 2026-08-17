@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Service" Width="580" Height="790" WindowStartupLocation="CenterOwner"
-        ResizeMode="NoResize" Background="#FF17181D">
+        ResizeMode="NoResize" Background="{DynamicResource BackgroundBrush}">
   <Grid Margin="30">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <ScrollViewer Grid.Row="0" Grid.RowSpan="2" VerticalScrollBarVisibility="Auto" Margin="0,0,0,16">
@@ -32,7 +32,7 @@
         <ComboBoxItem><TextBlock Text="Fill" Foreground="#FF111217"/></ComboBoxItem>
         <ComboBoxItem><TextBlock Text="Fit" Foreground="#FF111217"/></ComboBoxItem>
       </ComboBox>
-      <Border Height="1" Background="#FF353740" Margin="0,0,0,22"/>
+      <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,0,0,22"/>
       <TextBlock Text="Experience" FontSize="17" FontWeight="SemiBold" Margin="0,0,0,8"/>
       <TextBlock Text="Choose how this service identifies its browser." Foreground="{StaticResource MutedBrush}" Margin="0,0,0,12"/>
       <ComboBox x:Name="ExperienceBox" SelectionChanged="ExperienceBox_SelectionChanged" SelectedIndex="0" Margin="0,0,0,12">
@@ -40,7 +40,7 @@
         <ComboBoxItem><TextBlock Text="Default Experience" Foreground="#FF111217"/></ComboBoxItem>
         <ComboBoxItem><TextBlock Text="TV Experience" Foreground="#FF111217"/></ComboBoxItem>
       </ComboBox>
-      <Border x:Name="TvExperienceWarning" Visibility="Collapsed" Background="#FF24232C" BorderBrush="#667C5CFC" BorderThickness="1" CornerRadius="9" Padding="13" Margin="0,0,0,16">
+      <Border x:Name="TvExperienceWarning" Visibility="Collapsed" Background="{DynamicResource AccentSubtleBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="9" Padding="13" Margin="0,0,0,16">
         <TextBlock Text="TV Experience uses a smart-TV browser identity to request a TV-optimized interface. Not all streaming services provide a TV web interface, so some services may show their normal interface or may not work correctly."
                    Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" LineHeight="20"/>
       </Border>
@@ -50,7 +50,7 @@
           <TextBox x:Name="CustomUserAgentBox" TextWrapping="Wrap" MinHeight="65" ToolTip="Enter a complete user-agent string"/>
           <TextBlock Text="When set, this override takes precedence over the selected Experience's automatic browser identity. Leave it empty for normal Experience behavior."
                      Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" LineHeight="19" Margin="0,9,0,0"/>
-          <Border Height="1" Background="#FF353740" Margin="0,18,0,16"/>
+          <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,18,0,16"/>
           <TextBlock Text="Browser data" FontWeight="SemiBold" Margin="0,0,0,6"/>
           <TextBlock Text="Clearing this service's browser data signs it out and removes its isolated WebView2 profile. The change occurs after Save."
                      Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" LineHeight="19" Margin="0,0,0,10"/>

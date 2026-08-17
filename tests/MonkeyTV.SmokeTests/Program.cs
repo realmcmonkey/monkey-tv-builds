@@ -8,9 +8,9 @@ static void Require(bool condition, string message)
 }
 
 PortablePaths.EnsureCreated();
-Require(App.DisplayVersion == "0.0.2-alpha", "Release version metadata is incorrect.");
-Require(App.BuildNumber == "3", "Build #3 metadata is incorrect.");
-Require(App.AlphaWarningKey == "0.0.2-alpha-build-3", "Alpha warning is not keyed to Build #3.");
+Require(App.DisplayVersion == "0.0.3-alpha", "Release version metadata is incorrect.");
+Require(App.BuildNumber == "1", "Build #1 metadata is incorrect.");
+Require(App.AlphaWarningKey == "0.0.3-alpha-build-1", "Alpha warning is not keyed to v0.0.3 Build #1.");
 
 var legacyId = Guid.NewGuid();
 var legacyJson = $$"""
@@ -41,6 +41,7 @@ Require(migrated.Services[0].CustomUserAgentOverride == "Legacy-UA", "Legacy cus
 Require(migrated.Services[0].LegacyUserAgentMode is null && migrated.Services[0].LegacyCustomUserAgent is null, "Legacy fields were not cleared.");
 Require(migrated.CardStyle == ServiceCardStyle.Banner, "Existing settings did not migrate to Banner card style by default.");
 Require(migrated.TileSize == TileSize.Medium, "Existing settings did not retain the Medium default size.");
+Require(migrated.Theme == AppTheme.System && migrated.Accent == AppAccent.System, "Existing settings did not migrate to System theme/accent defaults.");
 Require(migrated.Services[0].BannerPath is null, "Existing service unexpectedly gained banner artwork.");
 Require(migrated.Services[0].BrowserStorageMode == BrowserStorageMode.UnifiedSharedProfile, "Build #2 migration did not select the unified browser profile.");
 Require(migrated.Services[0].FutureSettings.ContainsKey("Build1ProfilePath"), "Build #1 named profile was not retained for safe migration.");
@@ -70,6 +71,21 @@ foreach (var size in Enum.GetValues<TileSize>())
     Require(appearance.CardStyle == style, $"{style} card style did not persist.");
     Require(appearance.TileSize == size, $"{size} card size did not persist.");
 }
+
+foreach (var theme in Enum.GetValues<AppTheme>())
+foreach (var accent in Enum.GetValues<AppAccent>())
+{
+    reloaded.Theme = theme; reloaded.Accent = accent;
+    reloaded.WindowLeft = 135; reloaded.WindowTop = 95; reloaded.WindowWidth = 1080; reloaded.WindowHeight = 700; reloaded.WindowMaximized = accent == AppAccent.Red;
+    store.Save(reloaded);
+    var appearance = store.Load();
+    Require(appearance.Theme == theme && appearance.Accent == accent, "Theme/accent did not persist.");
+    Require(appearance.WindowLeft == 135 && appearance.WindowWidth == 1080, "Window bounds did not persist.");
+}
+
+Require(ExternalNavigationPolicy.TryHttpUri("https://example.test/path", out _), "Safe HTTPS URL was rejected.");
+Require(!ExternalNavigationPolicy.TryHttpUri("file:///private.txt", out _), "Non-web popup URL was accepted.");
+Require(ExternalNavigationPolicy.IsRelatedOrAuthentication(new Uri("https://video.example.test"), new Uri("https://auth.example.test/login")), "Related authentication popup was not recognized.");
 
 var sourceBanner = Path.Combine(PortablePaths.CacheDirectory, "manual-banner.png");
 var bannerBytes = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");

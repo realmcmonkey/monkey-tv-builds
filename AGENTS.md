@@ -9,10 +9,14 @@ Monkey TV is a legitimate streaming-site launcher, never a content host or DRM w
 - Target Windows 11 x64 with mouse and keyboard.
 - Keep all app-controlled writable data below `Data` next to the executable. Do not intentionally use AppData, LocalAppData, Documents, the registry, or absolute machine-specific paths.
 - Never preload, ping, or create browsers for configured services while on Home.
+- Startup must show the lightweight splash promptly and must not initialize WebView2, navigate a service, or contact a provider. Close the splash when Home is rendered; never impose a fake minimum duration.
 - Create one WebView2 only after the first service click, then reuse that exact WebView for every service. Home must immediately mute and hide it, render Home without awaiting browser work, and call `TrySuspendAsync` only after the controller is invisible. Selecting the same service resumes and unmutes its page. Selecting a different service resumes the same WebView, applies the destination configuration, and navigates it away while muted until the new destination is ready. Never allow more than one service WebView.
 - On Home, pause standard finite-duration HTML media and resume only media Monkey TV paused when the same service returns. If standard media APIs clearly identify a live stream, keep it running but muted and do not suspend it. For inaccessible/custom provider players, preserve the safe mute/hide and best-effort WebView2 suspension fallback; never claim perfect live-stream detection.
 - Keep services generic and data-driven. Provider-specific behavior belongs in optional service settings, not scattered conditionals.
 - User-agent mode is per service. Never globally spoof it.
+- Keep System/Light/Dark and accent styling within Monkey TV UI; never inject themes into provider pages. Persist only tiny appearance and validated normal/maximized window-placement fields, never F11 state or a prior service.
+- Permit at most one temporary same-profile child WebView for a user-initiated related/auth popup. Never add tabs or uncontrolled popup windows. Route clearly unrelated user-initiated popup links to the Windows default browser.
+- Web permissions must be conservative and session-only: never auto-enable notifications or persist a Monkey TV permission database. Website downloads require an explicit Windows Save path outside portable `Data`. Keep browser zoom at its normal default and do not add a zoom setting.
 - Use the WebView2 Runtime's legitimate media/DRM support. Never implement DRM.
 - Read the displayed version from assembly metadata. Alpha-warning dismissal is keyed to that exact version.
 - Monkey TV always starts at Home. Do not add Resume Last Service, a startup service, or automatic service reopening unless explicitly requested in the future.

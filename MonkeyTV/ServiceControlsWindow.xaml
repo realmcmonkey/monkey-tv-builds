@@ -13,7 +13,7 @@
     </Style>
   </Window.Resources>
   <Border x:Name="Surface" Margin="10,5,10,10" CornerRadius="17"
-          Background="#E6191A20" BorderBrush="#30FFFFFF" BorderThickness="1"
+          Background="{DynamicResource OverlayBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
           Padding="7,3" MouseEnter="Surface_MouseEnter" MouseMove="Surface_MouseMove">
     <Border.RenderTransform><TranslateTransform Y="-8"/></Border.RenderTransform>
     <Border.Effect><DropShadowEffect Color="Black" BlurRadius="24" ShadowDepth="5" Opacity="0.48"/></Border.Effect>

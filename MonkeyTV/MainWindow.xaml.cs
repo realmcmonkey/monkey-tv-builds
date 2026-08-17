@@ -20,6 +20,8 @@ public partial class MainWindow : Window
     private MonkeySettings _settings;
     private readonly SettingsStore _store;
     private WebView2? _webView;
+    private CoreWebView2Environment? _browserEnvironment;
+    private PopupWebViewWindow? _popupWindow;
     private readonly DispatcherTimer _clockTimer;
     private readonly DispatcherTimer _serviceUiTimer;
     private readonly DispatcherTimer _cacheBudgetTimer;
@@ -41,6 +43,7 @@ public partial class MainWindow : Window
     private Rect _previousBounds;
     private bool _browserProcessFailed;
     private bool _closing;
+    private bool _allowClose;
     private string? _defaultUserAgent;
     private bool _launchTransitionActive;
     private Guid? _launchServiceId;
@@ -388,6 +391,7 @@ public partial class MainWindow : Window
         try
         {
             var environment = await CoreWebView2Environment.CreateAsync(null, PortablePaths.SharedBrowserUserDataDirectory);
+            _browserEnvironment = environment;
             if (generation != _browserGeneration) return;
 
             var view = new WebView2
@@ -405,7 +409,12 @@ public partial class MainWindow : Window
             view.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
             view.CoreWebView2.Settings.AreDevToolsEnabled = false;
             view.CoreWebView2.Settings.IsStatusBarEnabled = false;
-            view.CoreWebView2.Settings.IsZoomControlEnabled = true;
+            view.CoreWebView2.Settings.IsZoomControlEnabled = false;
+            view.ZoomFactor = 1.0;
+            view.ZoomFactorChanged += (_, _) =>
+            {
+                if (Math.Abs(view.ZoomFactor - 1.0) > 0.001) view.ZoomFactor = 1.0;
+            };
             _defaultUserAgent = view.CoreWebView2.Settings.UserAgent;
             SetBrowserMuted(view, true);
             // WPF WebView2 forwards accelerator keys into the WPF input route.
@@ -423,10 +432,21 @@ public partial class MainWindow : Window
                     Dispatcher.BeginInvoke(() => SetApplicationFullscreen(false));
                 }
             };
-            view.CoreWebView2.NewWindowRequested += (_, e) => { e.Handled = true; view.CoreWebView2.Navigate(e.Uri); };
+            view.CoreWebView2.NewWindowRequested += WebView_NewWindowRequested;
+            view.CoreWebView2.PermissionRequested += WebView_PermissionRequested;
+            view.CoreWebView2.DownloadStarting += WebView_DownloadStarting;
             view.CoreWebView2.NavigationStarting += (_, e) => Dispatcher.Invoke(() =>
             {
                 if (generation != _browserGeneration || !ReferenceEquals(_webView, view)) return;
+                if (e.IsUserInitiated && ActiveService is { } originService &&
+                    ExternalNavigationPolicy.TryHttpUri(originService.Url, out var origin) &&
+                    ExternalNavigationPolicy.TryHttpUri(e.Uri, out var target) &&
+                    !ExternalNavigationPolicy.IsRelatedOrAuthentication(origin, target))
+                {
+                    e.Cancel = true;
+                    ExternalNavigationPolicy.OpenInDefaultBrowser(target.AbsoluteUri);
+                    return;
+                }
                 if (_launchTransitionActive && _launchServiceId == _activeServiceId)
                     _launchNavigationId = e.NavigationId;
             });
@@ -485,6 +505,100 @@ public partial class MainWindow : Window
         // original value once and explicitly restore it before a Default Experience navigation.
         var userAgent = BrowserIdentity.ResolveUserAgent(service) ?? _defaultUserAgent;
         if (!string.IsNullOrWhiteSpace(userAgent)) view.CoreWebView2.Settings.UserAgent = userAgent;
+    }
+
+    private async void WebView_NewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs e)
+    {
+        var deferral = e.GetDeferral();
+        try
+        {
+            e.Handled = true;
+            if (!e.IsUserInitiated) return;
+            var hasTarget = ExternalNavigationPolicy.TryHttpUri(e.Uri, out var target);
+            var blankTarget = string.IsNullOrWhiteSpace(e.Uri) || string.Equals(e.Uri, "about:blank", StringComparison.OrdinalIgnoreCase);
+            if (!hasTarget && !blankTarget) return;
+            var current = ExternalNavigationPolicy.TryHttpUri(_webView?.Source?.AbsoluteUri, out var source) ? source : null;
+            if (hasTarget && !ExternalNavigationPolicy.IsRelatedOrAuthentication(current, target))
+            {
+                ExternalNavigationPolicy.OpenInDefaultBrowser(target.AbsoluteUri);
+                return;
+            }
+
+            _popupWindow?.Close();
+            if (_browserEnvironment is null) return;
+            var popup = new PopupWebViewWindow { Owner = this, Title = $"{ActiveService?.Name ?? "Monkey TV"} sign-in" };
+            _popupWindow = popup;
+            popup.Closed += (_, _) => { if (ReferenceEquals(_popupWindow, popup)) _popupWindow = null; };
+            popup.Show();
+            await popup.InitializeAsync(_browserEnvironment, _webView?.CoreWebView2?.Settings.UserAgent);
+            e.NewWindow = popup.Core;
+        }
+        catch (Exception ex) { AppLog.Write("popup", ex.Message); }
+        finally { deferral.Complete(); }
+    }
+
+    private void WebView_PermissionRequested(object? sender, CoreWebView2PermissionRequestedEventArgs e)
+    {
+        var deferral = e.GetDeferral();
+        try
+        {
+            e.Handled = true;
+            e.SavesInProfile = false;
+            if (e.PermissionKind == CoreWebView2PermissionKind.Autoplay)
+            {
+                e.State = CoreWebView2PermissionState.Allow;
+                return;
+            }
+            if (e.PermissionKind == CoreWebView2PermissionKind.Notifications)
+            {
+                e.State = CoreWebView2PermissionState.Deny;
+                return;
+            }
+
+            var promptable = e.PermissionKind is CoreWebView2PermissionKind.Camera or
+                CoreWebView2PermissionKind.Microphone or CoreWebView2PermissionKind.Geolocation or
+                CoreWebView2PermissionKind.ClipboardRead;
+            if (!promptable)
+            {
+                e.State = CoreWebView2PermissionState.Deny;
+                return;
+            }
+
+            var origin = ExternalNavigationPolicy.TryHttpUri(e.Uri, out var uri) ? uri.Host : "this website";
+            var label = e.PermissionKind switch
+            {
+                CoreWebView2PermissionKind.Camera => "camera",
+                CoreWebView2PermissionKind.Microphone => "microphone",
+                CoreWebView2PermissionKind.Geolocation => "location",
+                _ => "clipboard"
+            };
+            var dialog = new ConfirmWindow($"Allow {label}?", $"{origin} is requesting temporary access to your {label}. Monkey TV will ask again next time.", "Allow once") { Owner = this };
+            e.State = dialog.ShowDialog() == true ? CoreWebView2PermissionState.Allow : CoreWebView2PermissionState.Deny;
+        }
+        catch (Exception ex)
+        {
+            e.State = CoreWebView2PermissionState.Deny;
+            AppLog.Write("permission", ex.Message);
+        }
+        finally { deferral.Complete(); }
+    }
+
+    private void WebView_DownloadStarting(object? sender, CoreWebView2DownloadStartingEventArgs e)
+    {
+        var deferral = e.GetDeferral();
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            try
+            {
+                e.Handled = true;
+                var suggested = Path.GetFileName(e.ResultFilePath);
+                var dialog = new SaveFileDialog { Title = "Save website download", FileName = suggested, AddExtension = true, OverwritePrompt = true };
+                if (dialog.ShowDialog(this) == true) e.ResultFilePath = dialog.FileName;
+                else e.Cancel = true;
+            }
+            catch (Exception ex) { e.Cancel = true; AppLog.Write("download", ex.Message); }
+            finally { deferral.Complete(); }
+        }));
     }
 
     private void BeginServiceLaunch(ServiceDefinition service)
@@ -787,7 +901,7 @@ public partial class MainWindow : Window
         var serviceWasVisible = BrowserView.Visibility == Visibility.Visible;
         if (serviceWasVisible) StopServiceUi();
         var settings = new SettingsWindow(_settings, _store) { Owner = this };
-        settings.ShowDialog(); _settings = _store.Load();
+        settings.ShowDialog(); _settings = _store.Load(); ThemeService.Apply(_settings);
         if (_activeServiceId is { } activeId && _settings.Services.All(s => s.Id != activeId)) DestroyBrowser();
         RenderHome();
         if (serviceWasVisible && _webView is not null) StartServiceUi();
@@ -802,10 +916,18 @@ public partial class MainWindow : Window
         else if (e.Key == Key.Escape && SearchContainer.Visibility == Visibility.Visible) { CloseSearch_Click(this, e); e.Handled = true; }
     }
 
+    private void Window_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (BrowserView.Visibility == Visibility.Visible && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+            e.Handled = true;
+    }
+
     private bool HandleApplicationShortcut(KeyEventArgs e)
     {
         var modifiers = Keyboard.Modifiers;
         var serviceActive = _webView is not null && BrowserView.Visibility == Visibility.Visible;
+        if (serviceActive && modifiers == ModifierKeys.Control && e.Key is Key.OemPlus or Key.Add or Key.OemMinus or Key.Subtract or Key.D0 or Key.NumPad0)
+        { if (_webView is not null) _webView.ZoomFactor = 1.0; e.Handled = true; return true; }
         if (e.Key == Key.Left && modifiers == ModifierKeys.Alt && serviceActive)
         { BrowserBack_Click(this, e); e.Handled = true; return true; }
         if (e.Key == Key.R && modifiers == ModifierKeys.Control && serviceActive)
@@ -852,17 +974,38 @@ public partial class MainWindow : Window
         catch (Exception ex) { AppLog.Write("storage", ex.Message); }
     }
 
-    private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+    private async void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
-        if (_closing) return; _closing = true;
+        if (_allowClose) return;
+        e.Cancel = true;
+        if (_closing) return;
+        _closing = true;
+        ShutdownOverlay.Visibility = Visibility.Visible;
+        StopServiceUi();
+        await Dispatcher.Yield(DispatcherPriority.Render);
+
+        WindowPlacementService.Capture(this, _settings, _appFullscreen);
         try { _store.Save(_settings); } catch (Exception ex) { AppLog.Write("shutdown", ex.Message); }
         _serviceUiTimer.Stop();
         try { _serviceControls.Close(); } catch { }
+        try { _popupWindow?.Close(); } catch { }
         DestroyBrowser();
-        StorageService.ClearAllTemporaryData();
-        StorageService.CleanupQueuedSharedProfileDeletes();
-        StorageService.CleanupOrphanAssets(_settings);
-        SessionMarker.MarkClean();
+        try
+        {
+            await Task.Run(() =>
+            {
+                StorageService.ClearAllTemporaryData();
+                StorageService.CleanupQueuedSharedProfileDeletes();
+                StorageService.CleanupOrphanAssets(_settings);
+            });
+            SessionMarker.MarkClean();
+        }
+        catch (Exception ex) { AppLog.Write("shutdown", ex.Message); }
+        finally
+        {
+            _allowClose = true;
+            Close();
+        }
     }
 
     internal void ToggleApplicationFullscreen() => SetApplicationFullscreen(!_appFullscreen);
@@ -870,6 +1013,11 @@ public partial class MainWindow : Window
     private void SetApplicationFullscreen(bool value)
     {
         if (value == _appFullscreen) return;
+        if (value)
+        {
+            WindowPlacementService.Capture(this, _settings, appFullscreen: false);
+            try { _store.Save(_settings); } catch { }
+        }
         _appFullscreen = value;
         UpdateFullscreenShell();
         _serviceControls.SetFullscreenState(_appFullscreen);

@@ -1,8 +1,8 @@
 <Window x:Class="MonkeyTV.SettingsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Monkey TV Settings" Width="980" Height="700" MinWidth="860" MinHeight="620"
-        WindowStartupLocation="CenterOwner" Background="#FF121318" PreviewKeyDown="Window_PreviewKeyDown">
+        Title="Monkey TV Settings" Width="980" Height="700" MinWidth="760" MinHeight="560"
+        WindowStartupLocation="CenterOwner" Background="{DynamicResource BackgroundBrush}" PreviewKeyDown="Window_PreviewKeyDown" Closing="Window_Closing">
   <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="210"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-    <Border Background="#FF191A20" Padding="24"><StackPanel>
+    <Border Background="{DynamicResource SurfaceBrush}" Padding="24"><StackPanel>
       <TextBlock Text="Settings" FontSize="24" FontWeight="SemiBold" Margin="4,4,0,30"/>
       <Button Content="Services" Tag="Services" HorizontalContentAlignment="Left" Click="Nav_Click" Margin="0,0,0,7"/>
       <Button Content="Appearance" Tag="Appearance" HorizontalContentAlignment="Left" Click="Nav_Click" Margin="0,0,0,7"/>
@@ -16,20 +16,22 @@
       <Grid x:Name="ServicesPage">
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
         <StackPanel><TextBlock Text="Services" FontSize="28" FontWeight="SemiBold"/><TextBlock Text="Add, edit, remove, or reorder the websites on Home." Foreground="{StaticResource MutedBrush}" Margin="0,7,0,22"/></StackPanel>
-        <ListBox x:Name="ServicesList" Grid.Row="1" Background="#FF1B1C22" BorderThickness="0" Foreground="White" FontSize="15" SelectionChanged="ServicesList_SelectionChanged">
-          <ListBox.ItemTemplate><DataTemplate><Grid Margin="8,10" Width="590"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{Binding Name}" FontWeight="SemiBold"/><TextBlock Text="{Binding Url}" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/></StackPanel><TextBlock Grid.Column="1" Text="⋮⋮" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center"/></Grid></DataTemplate></ListBox.ItemTemplate>
+        <ListBox x:Name="ServicesList" Grid.Row="1" Background="{DynamicResource SurfaceBrush}" BorderThickness="0" Foreground="{DynamicResource TextBrush}" FontSize="15" SelectionChanged="ServicesList_SelectionChanged">
+          <ListBox.ItemTemplate><DataTemplate><Grid Margin="8,10"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{Binding Name}" FontWeight="SemiBold"/><TextBlock Text="{Binding Url}" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/></StackPanel><TextBlock Grid.Column="1" Text="⋮⋮" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center"/></Grid></DataTemplate></ListBox.ItemTemplate>
         </ListBox>
         <Grid Grid.Row="2" Margin="0,18,0,0"><StackPanel Orientation="Horizontal"><Button Content="Add" Click="Add_Click" Margin="0,0,8,0"/><Button x:Name="EditButton" Content="Edit" Click="Edit_Click" IsEnabled="False" Margin="0,0,8,0"/><Button x:Name="RemoveButton" Content="Remove" Click="Remove_Click" IsEnabled="False"/></StackPanel><StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><Button x:Name="UpButton" Content="Move up" Click="Up_Click" IsEnabled="False" Margin="0,0,8,0"/><Button x:Name="DownButton" Content="Move down" Click="Down_Click" IsEnabled="False"/></StackPanel></Grid>
       </Grid>
-      <Grid x:Name="AppearancePage" Visibility="Collapsed"><Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><StackPanel>
-        <TextBlock Text="Appearance" FontSize="28" FontWeight="SemiBold"/><TextBlock Text="Adjust the Home service grid." Foreground="{StaticResource MutedBrush}" Margin="0,7,0,28"/>
+      <Grid x:Name="AppearancePage" Visibility="Collapsed"><Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
+        <TextBlock Text="Appearance" FontSize="28" FontWeight="SemiBold"/><TextBlock Text="Adjust Monkey TV's theme and Home service grid." Foreground="{DynamicResource MutedBrush}" Margin="0,7,0,28"/>
+        <TextBlock Text="Theme" Margin="0,0,0,8"/><ComboBox x:Name="ThemeBox" Width="220" HorizontalAlignment="Left" Margin="0,0,0,24" SelectionChanged="AppearancePreview_Changed"><ComboBoxItem Content="System"/><ComboBoxItem Content="Light"/><ComboBoxItem Content="Dark"/></ComboBox>
+        <TextBlock Text="Accent" Margin="0,0,0,8"/><ComboBox x:Name="AccentBox" Width="220" HorizontalAlignment="Left" Margin="0,0,0,24" SelectionChanged="AppearancePreview_Changed"><ComboBoxItem Content="System / default"/><ComboBoxItem Content="Blue"/><ComboBoxItem Content="Purple"/><ComboBoxItem Content="Green"/><ComboBoxItem Content="Orange"/><ComboBoxItem Content="Red"/></ComboBox>
         <TextBlock Text="Card style" Margin="0,0,0,8"/><ComboBox x:Name="CardStyleBox" Width="220" HorizontalAlignment="Left" Margin="0,0,0,24"><ComboBoxItem Content="Banner"/><ComboBoxItem Content="Square"/></ComboBox>
         <TextBlock Text="Card size" Margin="0,0,0,8"/><ComboBox x:Name="TileSizeBox" Width="220" HorizontalAlignment="Left" Margin="0,0,0,28"><ComboBoxItem Content="Small"/><ComboBoxItem Content="Medium"/><ComboBoxItem Content="Large"/></ComboBox>
         <CheckBox x:Name="ShowNamesCheck" Content="Show service names" Margin="0,0,0,20"/><CheckBox x:Name="ShowClockCheck" Content="Show clock on Home"/>
-      </StackPanel><Button Grid.Row="1" Style="{StaticResource AccentButton}" Content="Save appearance" HorizontalAlignment="Right" Click="SaveAppearance_Click"/></Grid>
+      </StackPanel></ScrollViewer><Button Grid.Row="1" Style="{StaticResource AccentButton}" Content="Save appearance" HorizontalAlignment="Right" Click="SaveAppearance_Click" Margin="0,16,0,0"/></Grid>
       <ScrollViewer x:Name="StoragePage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto"><StackPanel>
         <TextBlock Text="Storage" FontSize="28" FontWeight="SemiBold"/><TextBlock Text="Storage is measured only when this page opens or you refresh it. Temporary browser cache is kept separate from sign-in and site data." Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,7,0,22"/>
-        <Border Background="#FF1B1C22" CornerRadius="14" Padding="18" Margin="0,0,0,14"><StackPanel>
+        <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="14" Padding="18" Margin="0,0,0,14"><StackPanel>
           <TextBlock x:Name="TotalStorageText" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10"/>
           <Grid Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Settings &amp; services"/><TextBlock x:Name="SettingsStorageText" Grid.Column="1" Foreground="{StaticResource MutedBrush}"/></Grid>
           <Grid Margin="0,8,0,4"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Artwork"/><TextBlock x:Name="ArtworkStorageText" Grid.Column="1" Foreground="{StaticResource MutedBrush}"/></Grid>
@@ -38,7 +40,7 @@
           <Grid Margin="0,8,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Diagnostic logs"/><TextBlock x:Name="LogsStorageText" Grid.Column="1" Foreground="{StaticResource MutedBrush}"/></Grid>
         </StackPanel></Border>
         <StackPanel Orientation="Horizontal" Margin="0,0,0,22"><Button Content="Refresh" Click="RefreshStorage_Click" Margin="0,0,8,0"/><Button Style="{StaticResource AccentButton}" Content="Clear Temporary Data" Click="ClearTemporaryStorage_Click"/><TextBlock x:Name="StorageStatusText" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" Margin="12,0,0,0"/></StackPanel>
-        <Border Background="#2820252D" BorderBrush="#5AFFFFFF" BorderThickness="1" CornerRadius="14" Padding="18"><StackPanel>
+        <Border Background="{DynamicResource SubtleSurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="14" Padding="18"><StackPanel>
           <TextBlock Text="Advanced" FontSize="17" FontWeight="SemiBold"/><TextBlock Text="Clear Browser Data removes all WebView2 profiles, including streaming-service logins and site preferences. Reset Monkey TV also removes your services, settings, and artwork; first-time setup returns on the next launch." Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" LineHeight="19" Margin="0,7,0,14"/>
           <StackPanel Orientation="Horizontal"><Button Content="Clear Browser Data…" Click="ClearBrowserData_Click" Margin="0,0,8,0"/><Button Content="Reset Monkey TV…" Click="ResetMonkeyTv_Click"/></StackPanel>
         </StackPanel></Border>

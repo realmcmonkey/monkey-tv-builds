@@ -8,6 +8,8 @@ public enum TileSize { Small, Medium, Large }
 public enum ServiceCardStyle { Banner, Square }
 public enum BannerFit { Fill, Fit }
 public enum BrowserStorageMode { LegacyIsolated, SharedProfile, UnifiedSharedProfile }
+public enum AppTheme { System, Light, Dark }
+public enum AppAccent { System, Blue, Purple, Green, Orange, Red }
 
 public sealed class ServiceDefinition
 {
@@ -47,5 +49,12 @@ public sealed class MonkeySettings
     public ServiceCardStyle CardStyle { get; set; } = ServiceCardStyle.Banner;
     public bool ShowServiceNames { get; set; } = true;
     public bool ShowClock { get; set; } = true;
+    public AppTheme Theme { get; set; } = AppTheme.System;
+    public AppAccent Accent { get; set; } = AppAccent.System;
+    public double? WindowLeft { get; set; }
+    public double? WindowTop { get; set; }
+    public double? WindowWidth { get; set; }
+    public double? WindowHeight { get; set; }
+    public bool WindowMaximized { get; set; }
     public List<ServiceDefinition> Services { get; set; } = new();
 }

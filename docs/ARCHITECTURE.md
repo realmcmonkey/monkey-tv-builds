@@ -1,10 +1,11 @@
 # Architecture
 
-Monkey TV v0.0.2-alpha uses .NET 8 WPF for the shell and Microsoft Edge WebView2 for websites. This gives a native Windows desktop lifecycle, a modern custom shell, the browser engine already supported on Windows 11, persistent cookies, and access to the runtime's legitimate media capabilities.
+Monkey TV v0.0.3-alpha uses .NET 8 WPF for the shell and Microsoft Edge WebView2 for websites. This gives a native Windows desktop lifecycle, a modern custom shell, the browser engine already supported on Windows 11, persistent cookies, and access to the runtime's legitimate media capabilities.
 
 ## Main components
 
-- `App`: reads assembly informational version, creates portable paths, sequences warning → setup → Home.
+- `App`: immediately shows the lightweight splash, reads assembly informational version, creates portable paths, applies theme, and sequences warning → setup → Home. It does not initialize WebView2 during startup.
+- `ThemeService` / `WindowPlacementService`: apply System/Light/Dark and accent resources at runtime, follow Windows theme changes in System mode, and restore validated normal/maximized bounds without restoring a service or F11 state.
 - `SettingsStore`: atomic JSON persistence at `Data/Settings/settings.json`; malformed input has one bounded replacement backup.
 - `ServiceDefinition`: provider-neutral ID, name, URL, icon, optional banner artwork, per-service Experience, optional advanced custom-UA override, profile configuration, legacy migration fields, and future settings.
 - `IconService`: only runs while the user adds a service. It inspects icon link metadata and falls back to `/favicon.ico`; failures are non-fatal.
@@ -12,6 +13,7 @@ Monkey TV v0.0.2-alpha uses .NET 8 WPF for the shell and Microsoft Edge WebView2
 - `PortableAssetImporter`: imports banners as content-hashed JPEGs, limits them to 1600×900, uses quality 85, and deduplicates identical artwork.
 - `MainWindow`: renders a lightweight responsive Banner/Square Home grid, coordinates app/document fullscreen as separate states, and creates one WebView2 only after a service-card click.
 - `ServiceControlsWindow`: a small owned, transparent flyout above the HWND-hosted WebView. It is the only overlay hit-test surface, so the rest of the website remains unobstructed.
+- `PopupWebViewWindow` / `ExternalNavigationPolicy`: allow at most one temporary same-profile related/auth child and route unrelated user-initiated popup links to the default browser. No browser tabs are created.
 - `SettingsWindow` / `ServiceEditorWindow`: CRUD, ordering, appearance, backup/restore, on-demand storage, About/diagnostics, banner controls, Experience selection, and advanced custom-UA/site-data controls.
 - `BackupService`: validates and atomically imports a compact ZIP-based `.mtvbackup`; only configuration and referenced portable artwork are included.
 - `StorageService`: measures categories on demand, removes verified temporary cache, enforces a low-storage-oriented 100 MiB soft target, prunes orphaned app-owned artwork, and safely queues retained Build #1 profile folders for safe deletion.
@@ -47,6 +49,8 @@ The flyout appears briefly at service launch, hides after three seconds of inact
 Application fullscreen and WebView2 document fullscreen are tracked independently. F11 toggles only Monkey TV fullscreen. WebView2's supported `ContainsFullScreenElementChanged` event controls the document-fullscreen layer and suppresses Monkey TV overlays. This separation lets the first Escape leave website fullscreen while a second Escape can leave Monkey TV fullscreen. Physical monitor bounds come from the monitor containing the window, and the prior normal/maximized state and normal bounds are restored afterward.
 
 No DRM code exists in Monkey TV. Authentication, authorization, playback, subtitles, and protected media remain entirely provider/WebView2 responsibilities.
+
+WebView2 permission decisions are handled in memory: autoplay is allowed for legitimate media, notifications and unsupported privileged requests are denied, and user-facing camera, microphone, location, or clipboard requests receive a modern allow-once prompt with `SavesInProfile = false`. Downloads use WebView2's supported `DownloadStarting` deferral and an explicit Windows Save dialog; Monkey TV never chooses portable `Data` as a download sink. WebView2 zoom controls are disabled and the host maintains a 1.0 zoom factor.
 
 ## Portable storage
 
