@@ -58,6 +58,23 @@ public sealed class SettingsStore
                 service.LegacyCustomUserAgent = null;
                 changed = true;
             }
+
+            // Do not copy cookies, credentials, or protected-media state between Build #1
+            // profiles. Keep those folders on disk for manual recovery, but route all new
+            // launches through Build #2's one shared WebView2 profile.
+            if (service.BrowserStorageMode == BrowserStorageMode.SharedProfile &&
+                service.FutureSettings.TryGetValue("SharedProfilePath", out var buildOneProfilePath) &&
+                !string.IsNullOrWhiteSpace(buildOneProfilePath) &&
+                !service.FutureSettings.ContainsKey("Build1ProfilePath"))
+            {
+                service.FutureSettings["Build1ProfilePath"] = buildOneProfilePath;
+                changed = true;
+            }
+            if (service.BrowserStorageMode != BrowserStorageMode.UnifiedSharedProfile)
+            {
+                service.BrowserStorageMode = BrowserStorageMode.UnifiedSharedProfile;
+                changed = true;
+            }
         }
         return changed;
     }

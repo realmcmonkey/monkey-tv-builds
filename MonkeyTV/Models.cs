@@ -7,7 +7,7 @@ public enum ServiceExperience { Default, TV }
 public enum TileSize { Small, Medium, Large }
 public enum ServiceCardStyle { Banner, Square }
 public enum BannerFit { Fill, Fit }
-public enum BrowserStorageMode { LegacyIsolated, SharedProfile }
+public enum BrowserStorageMode { LegacyIsolated, SharedProfile, UnifiedSharedProfile }
 
 public sealed class ServiceDefinition
 {
@@ -22,8 +22,9 @@ public sealed class ServiceDefinition
     public ServiceExperience Experience { get; set; } = ServiceExperience.Default;
     public string? CustomUserAgentOverride { get; set; }
     public string ProfileConfiguration { get; set; } = "Persistent";
-    // Null is intentional for existing configurations: retain a legacy isolated UDF if it exists.
-    // New services are explicitly marked SharedProfile by the editor.
+    // Build #2 uses one shared browser profile. Earlier modes remain only to preserve
+    // configuration and on-disk data during migration; they are no longer selected for launch.
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public BrowserStorageMode? BrowserStorageMode { get; set; }
     public Dictionary<string, string> FutureSettings { get; set; } = new();

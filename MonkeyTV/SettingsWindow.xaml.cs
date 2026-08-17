@@ -67,10 +67,9 @@ public partial class SettingsWindow : Window
     private void Remove_Click(object sender, RoutedEventArgs e)
     {
         if (Selected is not { } selected) return;
-        var confirmation = new ConfirmWindow("Remove service?", $"Remove {selected.Name} and its isolated legacy browser profile? This signs the service out if it uses a legacy profile.", "Remove") { Owner = this };
+        var confirmation = new ConfirmWindow("Remove service?", $"Remove {selected.Name}? Retained Build #1 profile data belonging only to this service will also be removed. The current shared browser profile is kept.", "Remove") { Owner = this };
         if (confirmation.ShowDialog() != true) return;
-        if (selected.BrowserStorageMode != BrowserStorageMode.SharedProfile) (Owner as MainWindow)?.ClearServiceData(selected.Id);
-        else if (selected.FutureSettings.TryGetValue("SharedProfilePath", out var profilePath)) StorageService.QueueSharedProfileDeletion(profilePath);
+        StorageService.RemoveRetainedServiceProfileData(selected);
         var index = ServicesList.SelectedIndex; _settings.Services.RemoveAt(index); SaveAndRefresh(Math.Min(index, _settings.Services.Count - 1));
     }
 

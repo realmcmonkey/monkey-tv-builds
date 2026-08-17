@@ -27,6 +27,9 @@ public partial class App : Application
         }
     }
 
+    // A build is a distinct alpha checkpoint even when its semantic prerelease version is unchanged.
+    public static string AlphaWarningKey => $"{DisplayVersion}-build-{BuildNumber}";
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -39,13 +42,13 @@ public partial class App : Application
             var store = new SettingsStore();
             var settings = store.Load();
 
-            if (!string.Equals(settings.DismissedAlphaVersion, DisplayVersion, StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(settings.DismissedAlphaVersion, AlphaWarningKey, StringComparison.OrdinalIgnoreCase))
             {
                 var warning = new AlphaWarningWindow(DisplayVersion) { Topmost = true };
                 if (warning.ShowDialog() != true) { Shutdown(); return; }
                 if (warning.DontShowAgain)
                 {
-                    settings.DismissedAlphaVersion = DisplayVersion;
+                    settings.DismissedAlphaVersion = AlphaWarningKey;
                     store.Save(settings);
                 }
             }

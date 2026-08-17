@@ -18,7 +18,7 @@ Test with a copy of the package and non-critical accounts. Back up `Data` before
 - [ ] Automatic icon succeeds where the site exposes one; manual replacement works.
 - [ ] Home search only filters configured service names.
 - [ ] Add, edit, remove, reorder, tile size, names, and clock work in Settings.
-- [ ] Dragging a card reorders it without opening it; a normal click still opens it; restart preserves the order.
+- [ ] Home cards open normally; service ordering is changed only through Settings or the card context menu and persists after restart.
 - [ ] Right-click Open, Edit, Move, Change Banner, Clear Temporary Data, and confirmed Remove work.
 - [ ] Banner and Square card modes render correctly at Small, Medium, and Large sizes and wrap as the window width changes.
 - [ ] Show service names only controls the separate label; generated fallback branding remains usable when labels are hidden.

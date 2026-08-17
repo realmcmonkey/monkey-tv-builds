@@ -18,7 +18,9 @@ public partial class ServiceEditorWindow : Window
     {
         InitializeComponent();
         _isNew = existing is null;
-        ClearDataButton.IsEnabled = existing is not null;
+        // WebView2 cannot safely clear every storage category by a configured-service name.
+        // Never wipe the shared profile as a side effect of editing one service.
+        ClearDataButton.IsEnabled = false;
         _service = existing is null ? new ServiceDefinition() : Clone(existing);
         if (existing is not null)
         {
@@ -31,6 +33,7 @@ public partial class ServiceEditorWindow : Window
             BannerFitBox.SelectedIndex = _service.BannerFit == BannerFit.Fit ? 1 : 0;
             ExperienceBox.SelectedIndex = _service.Experience == ServiceExperience.TV ? 1 : 0;
             CustomUserAgentBox.Text = _service.CustomUserAgentOverride ?? "";
+            ClearDataStatus.Text = "Per-service site-data clearing is unavailable with the shared browser profile. Use Storage to clear safe shared temporary data.";
         }
         UpdateExperienceWarning();
     }
@@ -99,7 +102,7 @@ public partial class ServiceEditorWindow : Window
         _service.CustomUserAgentOverride = string.IsNullOrWhiteSpace(CustomUserAgentBox.Text) ? null : CustomUserAgentBox.Text.Trim();
         _service.LegacyUserAgentMode = null;
         _service.LegacyCustomUserAgent = null;
-        if (_isNew) _service.BrowserStorageMode = BrowserStorageMode.SharedProfile;
+        _service.BrowserStorageMode = BrowserStorageMode.UnifiedSharedProfile;
 
         if (!string.IsNullOrWhiteSpace(_chosenIcon) && Path.IsPathRooted(_chosenIcon))
         {

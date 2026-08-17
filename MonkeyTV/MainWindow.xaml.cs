@@ -36,11 +36,9 @@ public partial class MainWindow : Window
     private ResizeMode _previousResizeMode;
     private bool _previousTopmost;
     private Rect _previousBounds;
-    private Point _dragStart;
-    private bool _dragInProgress;
-    private ServiceDefinition? _dragService;
     private bool _browserProcessFailed;
     private bool _closing;
+    private string? _defaultUserAgent;
 
     public MainWindow(MonkeySettings settings, SettingsStore store)
     {
@@ -149,10 +147,7 @@ public partial class MainWindow : Window
         button.Content = content;
         button.MouseEnter += (_, _) => AnimateCard(scale, lift, shadow, 1.025, -3, 25, .48);
         button.MouseLeave += (_, _) => AnimateCard(scale, lift, shadow, 1, 0, 18, .32);
-        button.Click += async (_, _) => { if (!_dragInProgress) await OpenServiceAsync(service); };
-        button.PreviewMouseLeftButtonDown += (_, e) => BeginServiceDrag(button, service, e);
-        button.PreviewMouseMove += ContinueServiceDrag;
-        button.PreviewMouseLeftButtonUp += FinishServiceDrag;
+        button.Click += async (_, _) => await OpenServiceAsync(service);
         button.ContextMenu = CreateServiceContextMenu(service);
         return button;
     }
@@ -229,76 +224,10 @@ public partial class MainWindow : Window
         Add("Move left", () => MoveService(service, -1), index > 0);
         Add("Move right", () => MoveService(service, 1), index >= 0 && index < _settings.Services.Count - 1);
         Add("Change banner…", () => ChangeBanner(service));
-        Add("Clear temporary data…", () => ClearTemporaryDataWithConfirmation(service));
+        Add("Clear shared temporary data…", () => ClearTemporaryDataWithConfirmation(service));
         menu.Items.Add(new Separator());
         Add("Remove…", () => RemoveService(service));
         return menu;
-    }
-
-    private void BeginServiceDrag(Button button, ServiceDefinition service, MouseButtonEventArgs e)
-    {
-        _dragStart = e.GetPosition(button);
-        _dragInProgress = false;
-        _dragService = service;
-        button.CaptureMouse();
-    }
-
-    private void ContinueServiceDrag(object sender, MouseEventArgs e)
-    {
-        if (sender is not Button button || _dragService is null || e.LeftButton != MouseButtonState.Pressed) return;
-        var point = e.GetPosition(button);
-        if (!_dragInProgress &&
-            Math.Abs(point.X - _dragStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
-            Math.Abs(point.Y - _dragStart.Y) < SystemParameters.MinimumVerticalDragDistance) return;
-        _dragInProgress = true;
-        e.Handled = true;
-    }
-
-    private void FinishServiceDrag(object sender, MouseButtonEventArgs e)
-    {
-        if (sender is not Button button || _dragService is null) return;
-        button.ReleaseMouseCapture();
-        if (!_dragInProgress)
-        {
-            var clickedService = _dragService;
-            _dragService = null;
-            e.Handled = true;
-            _ = OpenServiceAsync(clickedService);
-            return;
-        }
-
-        var pointInPanel = e.GetPosition(ServicesPanel);
-        var target = ServicesPanel.Children.OfType<Button>().FirstOrDefault(candidate =>
-        {
-            var origin = candidate.TranslatePoint(new Point(), ServicesPanel);
-            return new Rect(origin, candidate.RenderSize).Contains(pointInPanel);
-        })?.Tag as ServiceDefinition;
-        var source = _dragService;
-        _dragService = null;
-        if (target is not null && target.Id != source.Id) ReorderBefore(source, target);
-        e.Handled = true;
-        Dispatcher.BeginInvoke(() => _dragInProgress = false);
-    }
-
-    private void ReorderBefore(ServiceDefinition source, ServiceDefinition target)
-    {
-        var from = _settings.Services.IndexOf(source); var to = _settings.Services.IndexOf(target);
-        if (from < 0 || to < 0 || from == to) return;
-        _settings.Services.RemoveAt(from); if (from < to) to--; _settings.Services.Insert(to, source);
-        _store.Save(_settings); RenderHome();
-    }
-
-    private void ServicesPanel_Drop(object sender, DragEventArgs e)
-    {
-        if (!Guid.TryParse(e.Data.GetData(DataFormats.Text) as string, out var sourceId)) return;
-        var from = _settings.Services.FindIndex(s => s.Id == sourceId); if (from < 0) return;
-        var item = _settings.Services[from]; _settings.Services.RemoveAt(from); _settings.Services.Add(item); _store.Save(_settings); RenderHome(); e.Handled = true;
-    }
-
-    private void Service_DragOver(object sender, DragEventArgs e)
-    {
-        e.Effects = e.Data.GetDataPresent(DataFormats.Text) ? DragDropEffects.Move : DragDropEffects.None;
-        e.Handled = true;
     }
 
     private void MoveService(ServiceDefinition service, int delta)
@@ -327,21 +256,16 @@ public partial class MainWindow : Window
 
     private void ClearTemporaryDataWithConfirmation(ServiceDefinition service)
     {
-        var confirmation = new ConfirmWindow("Clear temporary data?", $"Remove disposable browser cache for {service.Name}? Login and persistent site storage will be kept.", "Clear") { Owner = this };
-        if (confirmation.ShowDialog() == true) ClearTemporaryServiceData(service.Id);
+        var confirmation = new ConfirmWindow("Clear shared temporary data?", $"Remove safe temporary browser cache shared by Monkey TV? Login and persistent site storage for {service.Name} and other services will be kept.", "Clear") { Owner = this };
+        if (confirmation.ShowDialog() == true) _ = ClearTemporaryDataAsync();
     }
 
     private void RemoveService(ServiceDefinition service)
     {
-        var confirmation = new ConfirmWindow("Remove service?", $"Remove {service.Name} and its isolated legacy browser profile? This signs the service out if it uses a legacy profile.", "Remove") { Owner = this };
+        var confirmation = new ConfirmWindow("Remove service?", $"Remove {service.Name}? Any retained Build #1 profile data belonging only to this service will also be removed. The current shared browser profile is kept.", "Remove") { Owner = this };
         if (confirmation.ShowDialog() != true) return;
-        if (service.BrowserStorageMode != BrowserStorageMode.SharedProfile) ClearServiceData(service.Id);
-        else
-        {
-            service.FutureSettings.TryGetValue("SharedProfilePath", out var profilePath);
-            StorageService.QueueSharedProfileDeletion(profilePath);
-            if (_webView is null) StorageService.CleanupQueuedSharedProfileDeletes();
-        }
+        StorageService.RemoveRetainedServiceProfileData(service);
+        if (_webView is null) StorageService.CleanupQueuedSharedProfileDeletes();
         _settings.Services.Remove(service); _store.Save(_settings); StorageService.CleanupOrphanAssets(_settings); RenderHome();
     }
 
@@ -396,22 +320,35 @@ public partial class MainWindow : Window
             return;
         }
 
-        // A different service always replaces the one suspended behind Home.
-        if (_webView is not null || _isBrowserLaunching || _activeServiceId is not null)
-            DestroyBrowser();
+        HomeView.Visibility = Visibility.Collapsed;
+        BrowserView.Visibility = Visibility.Visible;
+        LoadingOverlay.Visibility = Visibility.Visible;
+        ErrorOverlay.Visibility = Visibility.Collapsed;
+        LoadingText.Text = $"Opening {service.Name}…";
+
+        // Build #2 is a single-tab browser. A different service changes the destination of the
+        // same hidden WebView instead of creating another WebView or profile.
+        if (_webView?.CoreWebView2 is not null)
+        {
+            _browserProcessFailed = false;
+            _activeServiceId = service.Id;
+            try { _webView.CoreWebView2.Resume(); } catch { }
+            ApplyServiceSettings(_webView, service);
+            _webView.CoreWebView2.Navigate(service.Url);
+            StartServiceUi();
+            return;
+        }
+
+        if (_isBrowserLaunching) return;
 
         var generation = ++_browserGeneration;
         _browserProcessFailed = false;
         _activeServiceId = service.Id;
         _isBrowserLaunching = true;
         RemoveStaleBrowserChildren();
-        HomeView.Visibility = Visibility.Collapsed; BrowserView.Visibility = Visibility.Visible; LoadingOverlay.Visibility = Visibility.Visible; ErrorOverlay.Visibility = Visibility.Collapsed;
-        LoadingText.Text = $"Opening {service.Name}…";
         try
         {
-            var useLegacyProfile = service.BrowserStorageMode != BrowserStorageMode.SharedProfile && PortablePaths.HasLegacyProfile(service.Id);
-            var userDataFolder = useLegacyProfile ? PortablePaths.LegacyProfileFor(service.Id) : PortablePaths.SharedBrowserUserDataDirectory;
-            var environment = await CoreWebView2Environment.CreateAsync(null, userDataFolder);
+            var environment = await CoreWebView2Environment.CreateAsync(null, PortablePaths.SharedBrowserUserDataDirectory);
             if (generation != _browserGeneration) return;
 
             var view = new WebView2
@@ -419,36 +356,18 @@ public partial class MainWindow : Window
                 Visibility = Visibility.Collapsed
             };
             _webView = view; BrowserHost.Children.Add(view);
-            if (useLegacyProfile)
-                await view.EnsureCoreWebView2Async(environment);
-            else
-            {
-                var controllerOptions = environment.CreateCoreWebView2ControllerOptions();
-                controllerOptions.ProfileName = PortablePaths.SharedProfileName(service.Id);
-                await view.EnsureCoreWebView2Async(environment, controllerOptions);
-            }
+            await view.EnsureCoreWebView2Async(environment);
             if (generation != _browserGeneration || !ReferenceEquals(_webView, view))
             {
                 DisposeView(view);
                 return;
             }
 
-            // Apply the selected service identity and all browser settings before first navigation.
-            var resolvedUserAgent = BrowserIdentity.ResolveUserAgent(service);
-            if (!useLegacyProfile)
-            {
-                var relativeProfilePath = Path.GetRelativePath(PortablePaths.AppRoot, view.CoreWebView2.Profile.ProfilePath);
-                if (!service.FutureSettings.TryGetValue("SharedProfilePath", out var existingPath) || !string.Equals(existingPath, relativeProfilePath, StringComparison.OrdinalIgnoreCase))
-                {
-                    service.FutureSettings["SharedProfilePath"] = relativeProfilePath;
-                    _store.Save(_settings);
-                }
-            }
-            if (resolvedUserAgent is not null) view.CoreWebView2.Settings.UserAgent = resolvedUserAgent;
             view.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
             view.CoreWebView2.Settings.AreDevToolsEnabled = false;
             view.CoreWebView2.Settings.IsStatusBarEnabled = false;
             view.CoreWebView2.Settings.IsZoomControlEnabled = true;
+            _defaultUserAgent = view.CoreWebView2.Settings.UserAgent;
             // WPF WebView2 forwards accelerator keys into the WPF input route.
             view.PreviewKeyDown += (_, e) =>
             {
@@ -483,7 +402,8 @@ public partial class MainWindow : Window
                     view.Visibility = Visibility.Visible; LoadingOverlay.Visibility = Visibility.Collapsed; ErrorOverlay.Visibility = Visibility.Collapsed;
                     _ = EnforceActiveCacheBudgetAsync(view, generation);
                 }
-                else ShowServiceError(service, "Something went wrong while connecting to this service.", "WebView2 navigation status: " + e.WebErrorStatus);
+                else if (ActiveService is { } active)
+                    ShowServiceError(active, "Something went wrong while connecting to this service.", "WebView2 navigation status: " + e.WebErrorStatus);
             };
             view.CoreWebView2.ProcessFailed += (_, e) => Dispatcher.Invoke(() =>
             {
@@ -491,6 +411,7 @@ public partial class MainWindow : Window
                 _browserProcessFailed = true;
                 ShowServiceError(service, "The browser process stopped unexpectedly.", "WebView2 process failure: " + e.ProcessFailedKind);
             });
+            ApplyServiceSettings(view, service);
             view.CoreWebView2.Navigate(service.Url);
             _isBrowserLaunching = false;
             StartServiceUi();
@@ -503,6 +424,18 @@ public partial class MainWindow : Window
                 ShowServiceError(service, "Monkey TV couldn't start the browser for this service.", ex.GetType().Name + ": " + ex.Message);
             }
         }
+    }
+
+    private ServiceDefinition? ActiveService => _activeServiceId is { } id
+        ? _settings.Services.FirstOrDefault(service => service.Id == id)
+        : null;
+
+    private void ApplyServiceSettings(WebView2 view, ServiceDefinition service)
+    {
+        // CoreWebView2 cannot reset UserAgent by assigning an empty value. Save the runtime's
+        // original value once and explicitly restore it before a Default Experience navigation.
+        var userAgent = BrowserIdentity.ResolveUserAgent(service) ?? _defaultUserAgent;
+        if (!string.IsNullOrWhiteSpace(userAgent)) view.CoreWebView2.Settings.UserAgent = userAgent;
     }
 
     private void ShowServiceError(ServiceDefinition service, string message, string details)
@@ -634,12 +567,6 @@ public partial class MainWindow : Window
         if (e.Key == Key.OemComma && modifiers == ModifierKeys.Control)
         { e.Handled = true; Settings_Click(this, e); return true; }
         return false;
-    }
-
-    internal void ClearTemporaryServiceData(Guid serviceId)
-    {
-        if (_activeServiceId == serviceId) DestroyBrowser();
-        StorageService.ClearTemporaryData(serviceId);
     }
 
     internal async Task ClearTemporaryDataAsync()
@@ -824,12 +751,6 @@ public partial class MainWindow : Window
         if (_websiteFullscreen)
         {
             if (inactive >= TimeSpan.FromSeconds(3)) HideCursor();
-            return;
-        }
-        if (_serviceControls.IsMouseOver)
-        {
-            _lastPointerActivity = DateTime.UtcNow;
-            RestoreCursor();
             return;
         }
         if (inactive >= TimeSpan.FromSeconds(3))

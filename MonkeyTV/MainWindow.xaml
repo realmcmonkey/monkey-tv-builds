@@ -88,7 +88,7 @@
               <TextBlock Text="Your services" FontSize="28" FontWeight="SemiBold"/>
               <TextBlock x:Name="ServicesSummaryText" Foreground="{StaticResource MutedBrush}" FontSize="13" Margin="0,5,0,0"/>
             </StackPanel>
-            <WrapPanel x:Name="ServicesPanel" HorizontalAlignment="Left" AllowDrop="True" DragOver="Service_DragOver" Drop="ServicesPanel_Drop"/>
+            <WrapPanel x:Name="ServicesPanel" HorizontalAlignment="Left"/>
             <Border x:Name="EmptyState" Visibility="Collapsed" Background="#661D1F27" BorderBrush="#22FFFFFF" BorderThickness="1" CornerRadius="18" Padding="32" MaxWidth="560" HorizontalAlignment="Left" Margin="0,4,0,0">
               <StackPanel>
                 <TextBlock x:Name="EmptyTitle" Text="Your services will appear here" FontSize="19" FontWeight="SemiBold"/>

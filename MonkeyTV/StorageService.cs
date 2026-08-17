@@ -41,8 +41,8 @@ public static class StorageService
         catch { return 0; }
     }
 
-    public static IReadOnlyList<ServiceStorage> MeasureServices(IEnumerable<ServiceDefinition> services) =>
-        services.Select(s => new ServiceStorage(s.Id, DirectorySize(Path.Combine(PortablePaths.ProfilesDirectory, s.Id.ToString("N"))))).ToList();
+    // Build #2 shares one WebView2 profile. Per-service values would be invented, so none are reported.
+    public static IReadOnlyList<ServiceStorage> MeasureServices(IEnumerable<ServiceDefinition> services) => Array.Empty<ServiceStorage>();
 
     public static StorageSnapshot GetSnapshot()
     {
@@ -106,6 +106,15 @@ public static class StorageService
     {
         var profile = Path.Combine(PortablePaths.ProfilesDirectory, serviceId.ToString("N"));
         if (Directory.Exists(profile)) Directory.Delete(profile, true);
+    }
+
+    // Used only when the user removes a service. Build #2's live shared profile is never part of
+    // this operation; these are Build #1 migration folders attributable to the removed service.
+    public static void RemoveRetainedServiceProfileData(ServiceDefinition service)
+    {
+        ClearServiceData(service.Id);
+        foreach (var key in new[] { "Build1ProfilePath", "SharedProfilePath" })
+            if (service.FutureSettings.TryGetValue(key, out var profilePath)) QueueSharedProfileDeletion(profilePath);
     }
 
     public static void ResetBrowserData()

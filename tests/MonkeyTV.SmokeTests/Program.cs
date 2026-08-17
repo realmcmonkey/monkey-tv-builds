@@ -8,6 +8,9 @@ static void Require(bool condition, string message)
 }
 
 PortablePaths.EnsureCreated();
+Require(App.DisplayVersion == "0.0.2-alpha", "Release version metadata is incorrect.");
+Require(App.BuildNumber == "2", "Build #2 metadata is incorrect.");
+Require(App.AlphaWarningKey == "0.0.2-alpha-build-2", "Alpha warning is not keyed to Build #2.");
 
 var legacyId = Guid.NewGuid();
 var legacyJson = $$"""
@@ -21,7 +24,8 @@ var legacyJson = $$"""
       "UserAgentMode": 1,
       "CustomUserAgent": "Legacy-UA",
       "ProfileConfiguration": "Persistent",
-      "FutureSettings": {}
+      "BrowserStorageMode": "SharedProfile",
+      "FutureSettings": { "SharedProfilePath": "Data/Browser/Shared/EBWebView/WV2Profile_service-example" }
     }
   ]
 }
@@ -38,6 +42,8 @@ Require(migrated.Services[0].LegacyUserAgentMode is null && migrated.Services[0]
 Require(migrated.CardStyle == ServiceCardStyle.Banner, "Existing settings did not migrate to Banner card style by default.");
 Require(migrated.TileSize == TileSize.Medium, "Existing settings did not retain the Medium default size.");
 Require(migrated.Services[0].BannerPath is null, "Existing service unexpectedly gained banner artwork.");
+Require(migrated.Services[0].BrowserStorageMode == BrowserStorageMode.UnifiedSharedProfile, "Build #2 migration did not select the unified browser profile.");
+Require(migrated.Services[0].FutureSettings.ContainsKey("Build1ProfilePath"), "Build #1 named profile was not retained for safe migration.");
 
 var tv = new ServiceDefinition { Name = "TV", Url = "https://www.youtube.com/tv", Experience = ServiceExperience.TV };
 Require(BrowserIdentity.ResolveUserAgent(tv) == BrowserIdentity.TvUserAgent, "TV Experience did not resolve the built-in TV UA.");
@@ -51,6 +57,8 @@ var reloaded = store.Load();
 var restoredTv = reloaded.Services.Single(s => s.Name == "TV");
 Require(restoredTv.Experience == ServiceExperience.TV, "TV Experience did not persist across reload.");
 Require(BrowserIdentity.ResolveUserAgent(restoredTv) == BrowserIdentity.TvUserAgent, "Reloaded TV Experience did not restore its UA.");
+Require(store.Load().Services.All(service => service.BrowserStorageMode == BrowserStorageMode.UnifiedSharedProfile), "New services did not persist the unified browser profile mode.");
+Require(StorageService.MeasureServices(store.Load().Services).Count == 0, "Shared browser storage was incorrectly attributed to services.");
 
 foreach (var style in Enum.GetValues<ServiceCardStyle>())
 foreach (var size in Enum.GetValues<TileSize>())
@@ -146,6 +154,8 @@ Directory.CreateDirectory(temporaryFolder); Directory.CreateDirectory(persistent
 File.WriteAllBytes(Path.Combine(temporaryFolder, "shader.bin"), new byte[96 * 1024]);
 File.WriteAllText(Path.Combine(persistentFolder, "keep.test"), "site-state");
 Require(StorageService.GetSnapshot().BrowserTemporaryBytes >= 96 * 1024, "Temporary browser cache was not classified.");
+File.WriteAllBytes(Path.Combine(temporaryFolder, "over-soft-budget.bin"), new byte[StorageService.TemporaryCacheBudgetBytes + 1]);
+Require(StorageService.ShouldClearActiveDiskCache(), "Small active cache budget was not enforced.");
 StorageService.ClearAllTemporaryData();
 Require(!Directory.Exists(temporaryFolder), "Known temporary browser cache was not removed.");
 Require(File.Exists(Path.Combine(persistentFolder, "keep.test")), "Temporary cleanup removed persistent DOM storage.");

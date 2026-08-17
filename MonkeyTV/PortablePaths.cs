@@ -37,7 +37,5 @@ public static class PortablePaths
     // Retained as a source-compatible name for legacy isolated service profiles.
     public static string ProfileFor(Guid serviceId) => LegacyProfileFor(serviceId);
 
-    public static string SharedProfileName(Guid serviceId) => "Service-" + serviceId.ToString("N");
-
     public static bool HasLegacyProfile(Guid serviceId) => Directory.Exists(Path.Combine(ProfilesDirectory, serviceId.ToString("N")));
 }
