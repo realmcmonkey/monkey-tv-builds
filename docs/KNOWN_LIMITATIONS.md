@@ -1,4 +1,6 @@
-# Known limitations — v0.0.3-alpha
+# Known limitations — v0.04-alpha
+
+- Built-in artwork matching is conservative and based on configured service name/domain. Unusual names or URLs may require manual selection from the artwork picker.
 
 - Streaming providers, logins, audio/video, subtitles, DRM, and provider fullscreen have not been account-tested. Provider policy may block embedded browsers even when Edge itself works. No bypass will be attempted.
 - The build relies on the WebView2 Evergreen Runtime installed on Windows.
@@ -25,3 +27,6 @@
 - App-controlled paths are portable, but .NET single-file native extraction and the installed WebView2 Runtime use operating-system locations outside `Data`.
 - Portable profiles may include machine-bound authentication/DRM data and can require reauthentication after copying PCs.
 - There is no startup PIN, controller support, automatic updater, installer, crash-report submission, or provider-specific integration in this alpha. Update checking currently has architecture only and makes no network request.
+# Current Location
+
+Current Location routes Monkey TV browser traffic through Direct mode or a limited set of NordVPN documented SOCKS5 locations. It is not a system-wide VPN and does not protect other Windows applications. Nord currently does not document SOCKS5 endpoints for every country, automatic recommended proxy selection, or general city discovery; Monkey TV therefore does not offer arbitrary countries such as Canada or the United Kingdom. WebRTC/UDP protection is best effort, not a zero-leak guarantee.

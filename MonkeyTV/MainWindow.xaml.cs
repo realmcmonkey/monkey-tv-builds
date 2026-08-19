@@ -27,6 +27,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _cacheBudgetTimer;
     private readonly DispatcherTimer _launchTimeoutTimer;
     private readonly ServiceControlsWindow _serviceControls;
+    private readonly CurrentLocationRouter _locationRouter = new();
     private long _browserGeneration;
     private Guid? _activeServiceId;
     private bool _isBrowserLaunching;
@@ -83,12 +84,15 @@ public partial class MainWindow : Window
         StateChanged += (_, _) => Dispatcher.BeginInvoke(PositionServiceControls);
         Closing += MainWindow_Closing;
         Closed += (_, _) => Application.Current.Shutdown();
+        _locationRouter.Changed += (_, _) => Dispatcher.BeginInvoke(UpdateCurrentLocationControl);
+        UpdateCurrentLocationControl();
         RenderHome();
     }
 
     private void RenderHome()
     {
         ClockText.Visibility = _settings.ShowClock ? Visibility.Visible : Visibility.Collapsed;
+        CurrentLocationButton.Visibility = _settings.CurrentLocationEnabled ? Visibility.Visible : Visibility.Collapsed;
         var filter = SearchBox.Text?.Trim() ?? "";
         var services = _settings.Services.Where(s => s.Name.Contains(filter, StringComparison.CurrentCultureIgnoreCase)).ToList();
         ServicesPanel.Children.Clear();
@@ -177,8 +181,8 @@ public partial class MainWindow : Window
     private Grid CreateCardArtwork(ServiceDefinition service, double width, double height, bool banner)
     {
         var grid = new Grid();
-        var bannerFile = banner ? ResolveAsset(service.BannerPath) : null;
-        if (bannerFile is not null && TryLoadImage(bannerFile) is { } artwork)
+        var artwork = banner ? TryLoadAsset(service.BannerPath) : null;
+        if (artwork is not null)
         {
             grid.Children.Add(new System.Windows.Shapes.Rectangle
             {
@@ -195,7 +199,7 @@ public partial class MainWindow : Window
             return grid;
         }
 
-        var iconFile = ResolveAsset(service.IconPath);
+        var icon = TryLoadAsset(service.IconPath);
         var logoSize = Math.Min(height * (banner ? .46 : .48), width * .42);
         var logoSurface = new Border
         {
@@ -207,13 +211,13 @@ public partial class MainWindow : Window
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center
         };
-        if (iconFile is not null && TryLoadImage(iconFile) is { } icon)
+        if (icon is not null)
             logoSurface.Child = new Image { Source = icon, Stretch = Stretch.Uniform };
         else
             logoSurface.Child = Initial(service.Name, banner ? 28 : 32);
         grid.Children.Add(logoSurface);
 
-        if (iconFile is null && !_settings.ShowServiceNames)
+        if (icon is null && !_settings.ShowServiceNames)
         {
             grid.Children.Add(new TextBlock
             {
@@ -270,9 +274,14 @@ public partial class MainWindow : Window
 
     private void ChangeBanner(ServiceDefinition service)
     {
-        var picker = new OpenFileDialog { Filter = "Images|*.png;*.jpg;*.jpeg;*.webp;*.bmp|All files|*.*" };
-        if (picker.ShowDialog(this) != true) return;
-        try { service.BannerPath = PortableAssetImporter.ImportBanner(picker.FileName, service.Id); _store.Save(_settings); StorageService.CleanupOrphanAssets(_settings); RenderHome(); }
+        var picker = new ArtworkPickerWindow { Owner = this };
+        if (picker.ShowDialog() != true) return;
+        try
+        {
+            service.BannerPath = picker.SelectedReference ??
+                (picker.SelectedFilePath is not null ? PortableAssetImporter.ImportBanner(picker.SelectedFilePath, service.Id) : service.BannerPath);
+            _store.Save(_settings); StorageService.CleanupOrphanAssets(_settings); RenderHome();
+        }
         catch (Exception ex) { AppLog.Write("artwork", ex.Message); }
     }
 
@@ -317,6 +326,13 @@ public partial class MainWindow : Window
 
     private static TextBlock Initial(string name, double fontSize = 26) => new() { Text = string.IsNullOrWhiteSpace(name) ? "?" : name[..1].ToUpperInvariant(), FontSize = fontSize, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
     private static string? ResolveAsset(string? path) { if (string.IsNullOrWhiteSpace(path)) return null; var file = Path.IsPathRooted(path) ? path : Path.Combine(PortablePaths.AppRoot, path); return File.Exists(file) ? file : null; }
+    private static BitmapImage? TryLoadAsset(string? path)
+    {
+        if (BuiltInArtworkCatalog.IsBuiltInReference(path)) return BuiltInArtworkCatalog.TryLoad(path);
+        var file = ResolveAsset(path);
+        return file is null ? null : TryLoadImage(file);
+    }
+
     private static BitmapImage? TryLoadImage(string file)
     {
         try
@@ -362,6 +378,14 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (_locationRouter.State is CurrentLocationState.Connecting or CurrentLocationState.Failed)
+        {
+            HomeView.Visibility = Visibility.Collapsed; BrowserView.Visibility = Visibility.Visible;
+            BeginServiceLaunch(service);
+            ShowServiceError(service, "Choose or retry a Current Location before opening this service.", "The selected location route is not ready.");
+            return;
+        }
+
         HomeView.Visibility = Visibility.Collapsed;
         BrowserView.Visibility = Visibility.Visible;
         BeginServiceLaunch(service);
@@ -390,7 +414,13 @@ public partial class MainWindow : Window
         RemoveStaleBrowserChildren();
         try
         {
-            var environment = await CoreWebView2Environment.CreateAsync(null, PortablePaths.SharedBrowserUserDataDirectory);
+            var proxyPort = _locationRouter.EnsureGateway();
+            var options = new CoreWebView2EnvironmentOptions
+            {
+                // Narrow Feature #0.01 exception: one fixed loopback routing boundary.
+                AdditionalBrowserArguments = $"--proxy-server=http://127.0.0.1:{proxyPort} --disable-quic --force-webrtc-ip-handling-policy=disable_non_proxied_udp"
+            };
+            var environment = await CoreWebView2Environment.CreateAsync(null, PortablePaths.SharedBrowserUserDataDirectory, options);
             _browserEnvironment = environment;
             if (generation != _browserGeneration) return;
 
@@ -624,8 +654,8 @@ public partial class MainWindow : Window
         LoadingInitial.Text = string.IsNullOrWhiteSpace(service.Name) ? "?" : service.Name[..1].ToUpperInvariant();
         LoadingInitial.Visibility = Visibility.Visible;
 
-        var artworkFile = ResolveAsset(service.BannerPath) ?? ResolveAsset(service.IconPath);
-        if (artworkFile is null || TryLoadImage(artworkFile) is not { } artwork) return;
+        var artwork = TryLoadAsset(service.BannerPath) ?? TryLoadAsset(service.IconPath);
+        if (artwork is null) return;
         LoadingArtwork.Source = artwork;
         LoadingArtwork.Visibility = Visibility.Visible;
         LoadingInitial.Visibility = Visibility.Collapsed;
@@ -891,6 +921,93 @@ public partial class MainWindow : Window
         if (editor.ShowDialog() != true) return;
         _settings.Services.Add(editor.Result); _store.Save(_settings); RenderHome();
     }
+
+    private void UpdateCurrentLocationControl()
+    {
+        CurrentLocationText.Text = _locationRouter.DisplayName;
+        CurrentLocationButton.Visibility = _settings.CurrentLocationEnabled ? Visibility.Visible : Visibility.Collapsed;
+        CurrentLocationButton.IsEnabled = _locationRouter.State != CurrentLocationState.Connecting;
+        CurrentLocationButton.ToolTip = _locationRouter.State == CurrentLocationState.Failed
+            ? "Current Location failed — choose Retry or Direct"
+            : "Choose the route used by Monkey TV websites";
+    }
+
+    private void CurrentLocation_Click(object sender, RoutedEventArgs e)
+    {
+        var menu = new ContextMenu();
+        var direct = new MenuItem { Header = "🌐 Direct", IsCheckable = true, IsChecked = _locationRouter.State == CurrentLocationState.Direct };
+        direct.Click += async (_, _) => await ChangeLocationAsync(null);
+        menu.Items.Add(direct); menu.Items.Add(new Separator());
+        if (_locationRouter.State == CurrentLocationState.Failed && _locationRouter.RequestedLocation is { } failed)
+        {
+            var retry = new MenuItem { Header = "Retry " + failed.Name };
+            retry.Click += async (_, _) => await ChangeLocationAsync(failed);
+            menu.Items.Add(retry); menu.Items.Add(new Separator());
+        }
+        if (_settings.LastUsedNordLocation is { } last)
+        {
+            var previous = NordLocationCatalog.Get(last);
+            var item = new MenuItem { Header = "🌐 " + previous.Name + " — Last used" };
+            item.Click += async (_, _) => await ChangeLocationAsync(previous);
+            menu.Items.Add(item); menu.Items.Add(new Separator());
+        }
+        foreach (var location in NordLocationCatalog.All)
+        {
+            var item = new MenuItem { Header = "🌐 " + location.Name, IsCheckable = true, IsChecked = _locationRouter.ActiveLocation?.Id == location.Id };
+            item.Click += async (_, _) => await ChangeLocationAsync(location);
+            menu.Items.Add(item);
+        }
+        menu.Items.Add(new Separator());
+        var setup = new MenuItem { Header = "Set up NordVPN…" };
+        setup.Click += (_, _) => Settings_Click(this, new RoutedEventArgs());
+        menu.Items.Add(setup); menu.PlacementTarget = CurrentLocationButton; menu.IsOpen = true;
+    }
+
+    private async Task ChangeLocationAsync(NordLocation? location)
+    {
+        var service = ActiveService;
+        var wasBrowsing = service is not null && BrowserView.Visibility == Visibility.Visible;
+        if (location is null)
+        {
+            if (wasBrowsing) BeginServiceLaunch(service!);
+            _locationRouter.Block(); await _locationRouter.SelectDirectAsync();
+            if (wasBrowsing && _webView?.CoreWebView2 is not null)
+            { BeginServiceLaunch(service!); ApplyServiceSettings(_webView, service!); _webView.CoreWebView2.Navigate(service!.Url); }
+            return;
+        }
+        var credentials = NordCredentialStore.Load();
+        if (credentials is null)
+        {
+            var setup = new SettingsWindow(_settings, _store, "VPN") { Owner = this };
+            setup.ShowDialog(); credentials = NordCredentialStore.Load(); if (credentials is null) return;
+        }
+        if (wasBrowsing) BeginServiceLaunch(service!);
+        _locationRouter.Block();
+        var connected = await _locationRouter.SelectNordAsync(location, credentials);
+        if (!connected)
+        {
+            if (wasBrowsing) ShowServiceError(service!, "Monkey TV couldn't connect to " + location.Name + ".", "Nord SOCKS5 authentication or connection verification failed. Retry from Current Location or choose Direct.");
+            return;
+        }
+        _settings.LastUsedNordLocation = location.Id; _store.Save(_settings);
+        if (wasBrowsing && _webView?.CoreWebView2 is not null)
+        {
+            BeginServiceLaunch(service!); ApplyServiceSettings(_webView, service!); _webView.CoreWebView2.Navigate(service!.Url);
+        }
+    }
+
+    internal async Task SetCurrentLocationFeatureEnabledAsync(bool enabled)
+    {
+        if (!enabled)
+        {
+            // Do not leave a hidden Nord route active. This waits for Direct mode before the
+            // Settings page hides the Home control, and reloads only if a service is visible.
+            if (_locationRouter.State != CurrentLocationState.Direct) await ChangeLocationAsync(null);
+            _settings.CurrentLocationEnabled = false; _store.Save(_settings); RenderHome();
+            return;
+        }
+        _settings.CurrentLocationEnabled = true; _store.Save(_settings); RenderHome();
+    }
     private void BrowserBack_Click(object sender, RoutedEventArgs e) { if (_webView?.CanGoBack == true) _webView.GoBack(); }
     private void BrowserReload_Click(object sender, RoutedEventArgs e) { _webView?.Reload(); }
     private async void BrowserHome_Click(object sender, RoutedEventArgs e) => await ReturnHomeAsync();
@@ -990,6 +1107,7 @@ public partial class MainWindow : Window
         try { _serviceControls.Close(); } catch { }
         try { _popupWindow?.Close(); } catch { }
         DestroyBrowser();
+        try { await _locationRouter.DisposeAsync(); } catch { }
         try
         {
             await Task.Run(() =>

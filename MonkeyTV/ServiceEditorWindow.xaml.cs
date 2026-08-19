@@ -29,7 +29,7 @@ public partial class ServiceEditorWindow : Window
             _chosenIcon = _service.IconPath;
             _chosenBanner = _service.BannerPath;
             IconStatus.Text = string.IsNullOrWhiteSpace(_chosenIcon) ? "Automatically obtain from website" : _chosenIcon;
-            BannerStatus.Text = string.IsNullOrWhiteSpace(_chosenBanner) ? "Automatically look for landscape artwork" : _chosenBanner;
+            BannerStatus.Text = DescribeBanner(_chosenBanner);
             BannerFitBox.SelectedIndex = _service.BannerFit == BannerFit.Fit ? 1 : 0;
             ExperienceBox.SelectedIndex = _service.Experience == ServiceExperience.TV ? 1 : 0;
             CustomUserAgentBox.Text = _service.CustomUserAgentOverride ?? "";
@@ -67,11 +67,11 @@ public partial class ServiceEditorWindow : Window
 
     private void ChooseBanner_Click(object sender, RoutedEventArgs e)
     {
-        var picker = new OpenFileDialog { Filter = "Images|*.png;*.jpg;*.jpeg;*.webp;*.bmp|All files|*.*" };
-        if (picker.ShowDialog(this) != true) return;
-        _chosenBanner = picker.FileName;
+        var picker = new ArtworkPickerWindow { Owner = this };
+        if (picker.ShowDialog() != true) return;
+        _chosenBanner = picker.SelectedReference ?? picker.SelectedFilePath;
         _bannerReset = false;
-        BannerStatus.Text = picker.FileName;
+        BannerStatus.Text = DescribeBanner(_chosenBanner);
     }
 
     private void ResetBanner_Click(object sender, RoutedEventArgs e)
@@ -117,7 +117,11 @@ public partial class ServiceEditorWindow : Window
             IconStatus.Text = "Looking for an icon…";
             _service.IconPath = await IconService.TryDownloadAsync(_service);
         }
-        if (!string.IsNullOrWhiteSpace(_chosenBanner) && Path.IsPathRooted(_chosenBanner))
+        if (BuiltInArtworkCatalog.IsBuiltInReference(_chosenBanner))
+        {
+            _service.BannerPath = BuiltInArtworkCatalog.TryGet(_chosenBanner) is not null ? _chosenBanner : null;
+        }
+        else if (!string.IsNullOrWhiteSpace(_chosenBanner) && Path.IsPathRooted(_chosenBanner))
         {
             try
             {
@@ -132,9 +136,24 @@ public partial class ServiceEditorWindow : Window
         else if (_isNew && string.IsNullOrWhiteSpace(_chosenBanner))
         {
             BannerStatus.Text = "Looking for landscape artwork…";
-            _service.BannerPath = await ArtworkService.TryDownloadBannerAsync(_service);
+            var builtIn = BuiltInArtworkCatalog.FindBestMatch(_service.Name, _service.Url);
+            if (builtIn is not null)
+            {
+                _service.BannerPath = builtIn.Reference;
+                BannerStatus.Text = $"Built-in: {builtIn.Name}";
+            }
+            else
+            {
+                _service.BannerPath = await ArtworkService.TryDownloadBannerAsync(_service);
+            }
         }
         DialogResult = true; Close();
+    }
+
+    private static string DescribeBanner(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "Automatically choose built-in or website artwork";
+        return BuiltInArtworkCatalog.TryGet(value) is { } builtIn ? $"Built-in: {builtIn.Name}" : value;
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs e) { DialogResult = false; Close(); }

@@ -2,6 +2,7 @@ using Microsoft.Win32;
 using Microsoft.Web.WebView2.Core;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -15,19 +16,22 @@ public partial class SettingsWindow : Window
     private bool _appearanceReady;
     private bool _appearanceSaved;
 
-    public SettingsWindow(MonkeySettings settings, SettingsStore store)
+    public SettingsWindow(MonkeySettings settings, SettingsStore store, string? initialPage = null)
     {
         InitializeComponent(); _settings = settings; _store = store;
         CardStyleBox.SelectedIndex = (int)_settings.CardStyle; TileSizeBox.SelectedIndex = (int)_settings.TileSize;
         ThemeBox.SelectedIndex = (int)_settings.Theme; AccentBox.SelectedIndex = (int)_settings.Accent;
         ShowNamesCheck.IsChecked = _settings.ShowServiceNames; ShowClockCheck.IsChecked = _settings.ShowClock;
         AboutVersionText.Text = $"Version v{App.DisplayVersion} — Build #{App.BuildNumber}";
+        NordStatusText.Text = NordCredentialStore.HasCredentials ? "NordVPN service credentials are saved securely." : "No NordVPN service credentials are saved.";
+        ShowCurrentLocationCheck.IsChecked = _settings.CurrentLocationEnabled;
         RefreshList(); RefreshAbout(); _appearanceReady = true;
+        if (initialPage == "VPN") ShowPage(VpnPage);
     }
 
     private void ShowPage(FrameworkElement page)
     {
-        foreach (var candidate in new FrameworkElement[] { ServicesPage, AppearancePage, StoragePage, BackupPage, AboutPage }) candidate.Visibility = Visibility.Collapsed;
+        foreach (var candidate in new FrameworkElement[] { ServicesPage, AppearancePage, VpnPage, StoragePage, BackupPage, AboutPage }) candidate.Visibility = Visibility.Collapsed;
         page.Visibility = Visibility.Visible;
         if (ReferenceEquals(page, StoragePage)) RefreshStorage();
         if (ReferenceEquals(page, AboutPage)) RefreshAbout();
@@ -36,7 +40,7 @@ public partial class SettingsWindow : Window
     private void Nav_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string tag }) return;
-        ShowPage(tag switch { "Appearance" => AppearancePage, "Storage" => StoragePage, "Backup" => BackupPage, "About" => AboutPage, _ => ServicesPage });
+        ShowPage(tag switch { "Appearance" => AppearancePage, "VPN" => VpnPage, "Storage" => StoragePage, "Backup" => BackupPage, "About" => AboutPage, _ => ServicesPage });
     }
 
     private void RefreshList(int selected = -1)
@@ -105,6 +109,35 @@ public partial class SettingsWindow : Window
         if (!_appearanceReady) return;
         var preview = new MonkeySettings { Theme = (AppTheme)Math.Max(0, ThemeBox.SelectedIndex), Accent = (AppAccent)Math.Max(0, AccentBox.SelectedIndex) };
         ThemeService.Apply(preview);
+    }
+
+    private void SaveNordCredentials_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            NordCredentialStore.Save(NordUsernameBox.Text, NordPasswordBox.Password);
+            NordPasswordBox.Clear(); NordStatusText.Text = "NordVPN service credentials saved securely for this Windows user.";
+        }
+        catch (Exception ex) { NordStatusText.Text = "Could not save credentials: " + ex.Message; }
+    }
+
+    private void ClearNordCredentials_Click(object sender, RoutedEventArgs e)
+    {
+        NordCredentialStore.Clear(); NordUsernameBox.Clear(); NordPasswordBox.Clear(); NordStatusText.Text = "NordVPN service credentials cleared.";
+    }
+
+    private async void ShowCurrentLocation_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!IsLoaded) return;
+        var enabled = ShowCurrentLocationCheck.IsChecked == true;
+        if (Owner is MainWindow main) await main.SetCurrentLocationFeatureEnabledAsync(enabled);
+        else { _settings.CurrentLocationEnabled = enabled; _store.Save(_settings); }
+    }
+
+    private void GetNordCredentials_Click(object sender, RoutedEventArgs e)
+    {
+        try { Process.Start(new ProcessStartInfo("https://support.nordvpn.com/hc/en-us/articles/19685375790865-NordVPN-Proxy-servers-explained") { UseShellExecute = true }); }
+        catch { }
     }
 
     private void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)

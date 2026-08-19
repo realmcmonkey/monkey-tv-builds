@@ -1,8 +1,8 @@
 # Monkey TV
 
-Monkey TV is a portable Windows streaming-service launcher. It opens one configured website at a time in one reusable Microsoft Edge WebView2. Home immediately mutes and hides the active service, then suspends it so the same service can resume where it was left; choosing a different service hides that WebView behind a launch transition and navigates the same instance to the new destination. It does not host, download, proxy, capture, decrypt, or modify streaming content.
+Monkey TV is a portable Windows streaming-service launcher. It opens one configured website at a time in one reusable Microsoft Edge WebView2. Home immediately mutes and hides the active service, then suspends it so the same service can resume where it was left; choosing a different service hides that WebView behind a launch transition and navigates the same instance to the new destination. It does not host, download, capture, decrypt, or modify streaming content.
 
-Current version: **v0.0.3-alpha — Build #1**
+Current version: **v0.04-alpha — Build #1**
 
 ## Try the packaged alpha
 
@@ -13,7 +13,7 @@ The Microsoft Edge WebView2 Evergreen Runtime must be installed. It is normally 
 ## What works in this alpha
 
 - Version-aware alpha warning and per-version dismissal
-- Fast theme-aware startup splash; no browser or service is initialized on Home
+- Branded three-second-minimum startup splash; no browser or service is initialized on Home
 - Three-screen first-time setup
 - Generic services using name + URL
 - Best-effort website icon discovery and manual icon replacement
@@ -21,13 +21,14 @@ The Microsoft Edge WebView2 Evergreen Runtime must be installed. It is normally 
 - Responsive Banner/Square Home cards with Small/Medium/Large sizing
 - System/Light/Dark themes, restrained accent choices, and remembered safe on-screen window placement
 - Subtle expandable configured-service name search
-- Cached landscape artwork discovery and portable manual banner overrides
+- Searchable catalog of 46 embedded default banners, local automatic matching, website artwork discovery, and portable manual overrides
 - Add, edit, remove, and reorder services
 - Settings and modern per-card Open/Edit/Move/Banner/Cleanup/Remove actions
 - Per-service Default Experience or TV Experience, with an optional Advanced custom-UA override
 - Per-service banner Fill/Fit, optimized portable banner imports, and safe site-data clearing
 - On-demand WebView2 creation; no service preloading
 - One reusable WebView2 and one shared portable browser profile for every configured service
+- Optional browser-only Current Location selector: Direct at every startup, or user-selected documented NordVPN SOCKS5 presets using protected Nord service credentials (not a device-wide VPN)
 - Same-service Home resume; different services reuse the same WebView and navigate it to the new destination
 - Local-artwork launch transition hides the previous website until a different service finishes its initial navigation
 - Friendly navigation/process-failure screens with Retry and Home

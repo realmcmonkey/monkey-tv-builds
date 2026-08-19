@@ -20,7 +20,7 @@
       </StackPanel>
       <TextBlock Text="Banner artwork" Margin="0,0,0,7"/>
       <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-        <TextBlock x:Name="BannerStatus" Text="Automatically look for landscape artwork" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" Width="310" TextTrimming="CharacterEllipsis"/>
+        <TextBlock x:Name="BannerStatus" Text="Automatically choose built-in or website artwork" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" Width="310" TextTrimming="CharacterEllipsis"/>
         <Button Content="Change…" Click="ChooseBanner_Click" Margin="0,0,8,0"/>
         <Button Content="Reset" Click="ResetBanner_Click"/>
       </StackPanel>

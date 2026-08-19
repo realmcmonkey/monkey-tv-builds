@@ -4,8 +4,11 @@ Test with a copy of the package and non-critical accounts. Back up `Data` before
 
 ## Shell and setup
 
-- [ ] Launch immediately shows the Monkey TV splash, then `Monkey TV v0.0.3-alpha`; the splash disappears as soon as Home is ready.
+- [ ] Launch immediately shows the Monkey TV splash, then `Monkey TV v0.04-alpha`; the splash disappears as soon as Home is ready.
 - [ ] Startup creates no service WebView and makes no provider request before a service is clicked.
+- [ ] Startup shows `Current Location: Direct`; no NordVPN connection or location traffic occurs automatically. A prior Nord location appears only as an inactive `Last used` choice.
+- [ ] Fresh setup offers optional Current Location. Set up saves Nord **service** credentials and enables the Home control without connecting; Skip completes setup, remains Direct, and hides the control.
+- [ ] Existing setup-complete installations do not see setup again; Settings can enable Current Location later.
 - [ ] Continue works; per-version suppression works after restart.
 - [ ] Setup adds one service, Add More works repeatedly, and Done advances.
 - [ ] Tile size, names, and clock settings appear correctly.
@@ -18,6 +21,12 @@ Test with a copy of the package and non-critical accounts. Back up `Data` before
 - [ ] Closed ComboBox values and open normal/hovered/selected/disabled items remain readable in Light and Dark modes.
 
 ## Services and portability
+
+- [ ] Confirm the supplied Monkey TV logo appears in the executable/window, Home header, alpha warning, and startup splash.
+- [ ] Confirm the splash remains visible for at least three seconds and does not initialize WebView2.
+- [ ] Open Add/Edit Service → Change banner and confirm all 46 built-in banners appear under Canada, General, United Kingdom, United States, and Web.
+- [ ] Search the artwork picker and select a built-in banner; confirm it renders on Home and adds no file to portable `Data`.
+- [ ] Add a clearly named supported service and confirm conservative local default-artwork matching; verify custom file import still works.
 
 - [ ] Automatic icon succeeds where the site exposes one; manual replacement works.
 - [ ] Home search only filters configured service names.
@@ -60,6 +69,8 @@ Test with a copy of the package and non-critical accounts. Back up `Data` before
 - [ ] The transition and its Home button work in normal and F11 fullscreen modes.
 - [ ] Disney+ -> Home -> YouTube TV, YouTube TV -> Home -> Paramount+, and Paramount+ -> Home -> Disney+ each load the selected URL.
 - [ ] Restart retains services and appearance.
+- [ ] Select a documented Nord Current Location only after saving service credentials; confirm the control changes only after verification succeeds, a failed route shows Retry/Direct guidance, and Direct reloads the active service through the direct route.
+- [ ] Confirm Home does not change the active Current Location and opening a service never reconnects a remembered location automatically.
 
 ## Reliability, backup, and diagnostics
 

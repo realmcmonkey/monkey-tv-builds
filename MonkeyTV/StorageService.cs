@@ -155,7 +155,8 @@ public static class StorageService
     public static void CleanupOrphanAssets(MonkeySettings settings)
     {
         var referenced = settings.Services.SelectMany(s => new[] { s.IconPath, s.BannerPath })
-            .Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => Path.GetFullPath(Path.Combine(PortablePaths.AppRoot, p!)))
+            .Where(p => !string.IsNullOrWhiteSpace(p) && !BuiltInArtworkCatalog.IsBuiltInReference(p))
+            .Select(p => Path.GetFullPath(Path.Combine(PortablePaths.AppRoot, p!)))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var root in new[] { PortablePaths.AssetsDirectory, PortablePaths.BannersDirectory })
         {

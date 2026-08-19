@@ -6,6 +6,7 @@
       <TextBlock Text="Settings" FontSize="24" FontWeight="SemiBold" Margin="4,4,0,30"/>
       <Button Content="Services" Tag="Services" HorizontalContentAlignment="Left" Click="Nav_Click" Margin="0,0,0,7"/>
       <Button Content="Appearance" Tag="Appearance" HorizontalContentAlignment="Left" Click="Nav_Click" Margin="0,0,0,7"/>
+      <Button Content="Current Location" Tag="VPN" HorizontalContentAlignment="Left" Click="Nav_Click" Margin="0,0,0,7"/>
       <Button Content="Storage" Tag="Storage" HorizontalContentAlignment="Left" Click="Nav_Click" Margin="0,0,0,7"/>
       <Button Content="Backup &amp; restore" Tag="Backup" HorizontalContentAlignment="Left" Click="Nav_Click" Margin="0,0,0,7"/>
       <Button Content="About Monkey TV" Tag="About" HorizontalContentAlignment="Left" Click="Nav_Click"/>
@@ -29,6 +30,21 @@
         <TextBlock Text="Card size" Margin="0,0,0,8"/><ComboBox x:Name="TileSizeBox" Width="220" HorizontalAlignment="Left" Margin="0,0,0,28"><ComboBoxItem Content="Small"/><ComboBoxItem Content="Medium"/><ComboBoxItem Content="Large"/></ComboBox>
         <CheckBox x:Name="ShowNamesCheck" Content="Show service names" Margin="0,0,0,20"/><CheckBox x:Name="ShowClockCheck" Content="Show clock on Home"/>
       </StackPanel></ScrollViewer><Button Grid.Row="1" Style="{StaticResource AccentButton}" Content="Save appearance" HorizontalAlignment="Right" Click="SaveAppearance_Click" Margin="0,16,0,0"/></Grid>
+      <ScrollViewer x:Name="VpnPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto"><StackPanel>
+        <TextBlock Text="Current Location" FontSize="28" FontWeight="SemiBold"/>
+        <TextBlock Text="NordVPN is optional. Monkey TV uses Nord's documented SOCKS5 locations only; your normal Nord account password is not used here." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" LineHeight="20" Margin="0,7,0,24"/>
+        <CheckBox x:Name="ShowCurrentLocationCheck" Content="Show Current Location on Home" Checked="ShowCurrentLocation_Changed" Unchecked="ShowCurrentLocation_Changed" Margin="0,0,0,20"/>
+        <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="14" Padding="20"><StackPanel>
+          <TextBlock Text="NordVPN service credentials" FontSize="18" FontWeight="SemiBold"/>
+          <TextBlock Text="Find these manual/service credentials in your NordVPN account. They are separate from your normal Nord Account login, protected for this Windows user, and excluded from backups." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,7,0,10"/>
+          <Button Content="Get NordVPN service credentials ↗" Click="GetNordCredentials_Click" HorizontalAlignment="Left" Background="Transparent" Padding="0,4" Margin="0,0,0,18"/>
+          <TextBlock Text="Service username"/><TextBox x:Name="NordUsernameBox" Margin="0,7,0,16"/>
+          <TextBlock Text="Service password"/><PasswordBox x:Name="NordPasswordBox" Margin="0,7,0,18"/>
+          <StackPanel Orientation="Horizontal"><Button Style="{StaticResource AccentButton}" Content="Save credentials" Click="SaveNordCredentials_Click" Margin="0,0,8,0"/><Button Content="Clear credentials" Click="ClearNordCredentials_Click"/></StackPanel>
+          <TextBlock x:Name="NordStatusText" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,14,0,0"/>
+        </StackPanel></Border>
+        <Border Background="{DynamicResource SubtleSurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,18,0,0"><TextBlock Text="Current Location is a browser-proxy route, not a device-wide VPN. QUIC is disabled while using Monkey TV's WebView; WebRTC protection is best effort and is not an absolute leak-proof boundary." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" LineHeight="20"/></Border>
+      </StackPanel></ScrollViewer>
       <ScrollViewer x:Name="StoragePage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto"><StackPanel>
         <TextBlock Text="Storage" FontSize="28" FontWeight="SemiBold"/><TextBlock Text="Storage is measured only when this page opens or you refresh it. Temporary browser cache is kept separate from sign-in and site data." Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,7,0,22"/>
         <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="14" Padding="18" Margin="0,0,0,14"><StackPanel>

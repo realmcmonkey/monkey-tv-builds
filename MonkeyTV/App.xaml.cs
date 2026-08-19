@@ -7,7 +7,8 @@ namespace MonkeyTV;
 
 public partial class App : Application
 {
-    private const string FallbackVersion = "0.0.3-alpha";
+    private const string FallbackVersion = "0.04-alpha";
+    private static readonly TimeSpan MinimumSplashDuration = TimeSpan.FromSeconds(3);
     internal static long LastStartupMilliseconds { get; private set; }
 
     private static string InformationalVersion => Assembly.GetExecutingAssembly()
@@ -33,7 +34,7 @@ public partial class App : Application
     // A build is a distinct alpha checkpoint even when its semantic prerelease version is unchanged.
     public static string AlphaWarningKey => $"{DisplayVersion}-build-{BuildNumber}";
 
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
         var startup = Stopwatch.StartNew();
@@ -50,6 +51,11 @@ public partial class App : Application
             var store = new SettingsStore();
             var settings = store.Load();
             ThemeService.Initialize(settings);
+
+            // Keep the branded splash unobscured for the requested minimum. Any genuinely
+            // slower startup naturally keeps it visible longer without loading WebView2.
+            var splashRemaining = MinimumSplashDuration - startup.Elapsed;
+            if (splashRemaining > TimeSpan.Zero) await Task.Delay(splashRemaining);
 
             if (!string.Equals(settings.DismissedAlphaVersion, AlphaWarningKey, StringComparison.OrdinalIgnoreCase))
             {

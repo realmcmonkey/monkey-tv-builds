@@ -10,6 +10,8 @@ public enum BannerFit { Fill, Fit }
 public enum BrowserStorageMode { LegacyIsolated, SharedProfile, UnifiedSharedProfile }
 public enum AppTheme { System, Light, Dark }
 public enum AppAccent { System, Blue, Purple, Green, Orange, Red }
+public enum CurrentLocationState { Direct, Connecting, Connected, Failed }
+public enum NordLocationId { UnitedStates, Netherlands, Sweden, Atlanta, Chicago, Dallas, LosAngeles, NewYork, Phoenix, SanFrancisco, Stockholm, Amsterdam }
 
 public sealed class ServiceDefinition
 {
@@ -56,5 +58,9 @@ public sealed class MonkeySettings
     public double? WindowWidth { get; set; }
     public double? WindowHeight { get; set; }
     public bool WindowMaximized { get; set; }
+    public bool CurrentLocationEnabled { get; set; }
+    // This is a convenience only. Startup always begins on Direct and never reconnects it.
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public NordLocationId? LastUsedNordLocation { get; set; }
     public List<ServiceDefinition> Services { get; set; } = new();
 }

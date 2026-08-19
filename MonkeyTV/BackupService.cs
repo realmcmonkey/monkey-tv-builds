@@ -65,6 +65,7 @@ public static class BackupService
 
     private static IEnumerable<string> ReferencedAssets(MonkeySettings settings) => settings.Services
         .SelectMany(s => new[] { s.IconPath, s.BannerPath }).Where(p => !string.IsNullOrWhiteSpace(p))
+        .Where(p => !BuiltInArtworkCatalog.IsBuiltInReference(p))
         .Select(p => Path.GetFullPath(Path.Combine(PortablePaths.AppRoot, p!)))
         .Where(p => p.StartsWith(Path.GetFullPath(PortablePaths.AssetsDirectory), StringComparison.OrdinalIgnoreCase) && File.Exists(p)).Distinct(StringComparer.OrdinalIgnoreCase);
 
@@ -87,6 +88,12 @@ public static class BackupService
     private static void ValidatePortableAssetPath(string? path)
     {
         if (string.IsNullOrWhiteSpace(path)) return;
+        if (BuiltInArtworkCatalog.IsBuiltInReference(path))
+        {
+            if (BuiltInArtworkCatalog.TryGet(path) is null)
+                throw new InvalidDataException("The backup references unknown built-in artwork.");
+            return;
+        }
         var full = Path.GetFullPath(Path.Combine(PortablePaths.AppRoot, path));
         var root = Path.GetFullPath(PortablePaths.AssetsDirectory).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
         if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase))

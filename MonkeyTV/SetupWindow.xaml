@@ -10,7 +10,8 @@
         <TextBlock Text="Monkey TV" FontSize="22" FontWeight="SemiBold" Margin="0,4,0,38"/>
         <TextBlock x:Name="Step1Label" Text="1   Add services" FontSize="15" Margin="0,0,0,22"/>
         <TextBlock x:Name="Step2Label" Text="2   Appearance" FontSize="15" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,22"/>
-        <TextBlock x:Name="Step3Label" Text="3   Finish" FontSize="15" Foreground="{StaticResource MutedBrush}"/>
+        <TextBlock x:Name="Step3Label" Text="3   Current Location (optional)" FontSize="15" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,22"/>
+        <TextBlock x:Name="Step4Label" Text="4   Finish" FontSize="15" Foreground="{StaticResource MutedBrush}"/>
       </StackPanel>
     </Border>
     <Grid Grid.Column="1" Margin="48,42,48,38">
@@ -60,6 +61,27 @@
           <TextBlock Text="Setup complete" FontSize="30" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,22,0,10"/>
           <TextBlock Text="Your services and preferences are saved in Monkey TV's portable Data folder." Foreground="{StaticResource MutedBrush}" TextAlignment="Center" TextWrapping="Wrap" LineHeight="21"/>
           <Button Style="{StaticResource AccentButton}" Content="Open Monkey TV" Click="OpenMonkeyTV_Click" Margin="0,34,0,0" HorizontalAlignment="Center" MinWidth="170"/>
+        </StackPanel>
+      </Grid>
+      <Grid x:Name="LocationStep" Visibility="Collapsed">
+        <StackPanel VerticalAlignment="Center" Width="500">
+          <TextBlock Text="Current Location" FontSize="30" FontWeight="SemiBold"/>
+          <TextBlock Text="Optionally use supported NordVPN locations for Monkey TV browser traffic. This affects Monkey TV only, not the rest of Windows." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" LineHeight="21" Margin="0,10,0,22"/>
+          <Border Background="{DynamicResource SubtleSurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="14" Padding="18">
+            <StackPanel><TextBlock Text="You can set this up later in Settings." FontWeight="SemiBold"/><TextBlock Text="Monkey TV always starts Direct and never connects to NordVPN automatically." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,7,0,0"/></StackPanel>
+          </Border>
+          <StackPanel Orientation="Horizontal" Margin="0,28,0,0"><Button Style="{StaticResource AccentButton}" Content="Set up Current Location" Click="SetUpLocation_Click" Margin="0,0,10,0"/><Button Content="Skip" Click="SkipLocation_Click"/></StackPanel>
+        </StackPanel>
+      </Grid>
+      <Grid x:Name="LocationCredentialsStep" Visibility="Collapsed">
+        <StackPanel VerticalAlignment="Center" Width="500">
+          <TextBlock Text="Set up NordVPN" FontSize="30" FontWeight="SemiBold"/>
+          <TextBlock Text="Monkey TV uses NordVPN service credentials for manual/third-party connections. These are separate from your normal Nord Account email and password." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" LineHeight="21" Margin="0,10,0,14"/>
+          <Button Content="Get NordVPN service credentials ↗" Click="GetNordCredentials_Click" HorizontalAlignment="Left" Background="Transparent" Padding="0,5" Margin="0,0,0,20"/>
+          <TextBlock Text="Service username"/><TextBox x:Name="NordUsernameBox" Margin="0,7,0,16"/>
+          <TextBlock Text="Service password"/><PasswordBox x:Name="NordPasswordBox" Margin="0,7,0,18"/>
+          <TextBlock x:Name="NordSetupStatus" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,0,0,14"/>
+          <StackPanel Orientation="Horizontal"><Button Style="{StaticResource AccentButton}" Content="Save and continue" Click="SaveLocationCredentials_Click" Margin="0,0,10,0"/><Button Content="Skip" Click="SkipLocation_Click"/></StackPanel>
         </StackPanel>
       </Grid>
     </Grid>

@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.04-alpha — Build #1
+
+- Added optional **Current Location** setup: users can configure NordVPN service credentials during first-run setup or skip the feature entirely.
+- Added the optional Home Current Location control and Settings visibility switch. Turning it off safely returns Monkey TV to Direct before hiding the control; saved credentials remain available if re-enabled later.
+- Added global manual browser-level geographic routing through NordVPN's officially documented SOCKS5 locations, using a fixed Monkey TV loopback gateway and one shared WebView2/profile.
+- Current Location always begins as Direct on every launch. Nord is never reconnected, checked, or contacted automatically; a previous successful location is only an inactive Last used choice.
+- Route changes verify before a visible service is reloaded. Failed Nord routes remain blocked rather than silently falling back to Direct.
+- Nord credentials use Windows DPAPI and are excluded from logs, diagnostics, backups, exports, and packages. Added official service-credential guidance links.
+
+Known alpha limitations: Current Location is browser-proxy routing only, not a full device VPN or absolute WebRTC/UDP leak-proof boundary. Real Nord authentication, endpoint availability, provider playback, and WebRTC behavior require manual testing with valid service credentials.
+
+## v0.0.3-alpha — Build #2
+
+- Added 46 compact built-in service banners from the supplied Canada, General, UK, USA, and Web artwork collections.
+- Added a searchable, categorized service-artwork picker that supports built-in banners and the existing portable file-import flow.
+- Added local built-in artwork matching for newly configured services before website artwork discovery; no provider page is contacted merely to render the picker.
+- Kept built-in artwork inside the single executable so selections add no files to portable `Data`, configuration backups remain small, and existing custom artwork continues to work.
+- Added the supplied Monkey TV image as the executable/window icon, Home branding, alpha-warning logo, and startup splash artwork.
+- Changed the splash to remain visible for at least three seconds and longer when Home is not ready, without initializing WebView2 or preloading a service.
+
+Known alpha limitation: automatic artwork matching is intentionally conservative. Services with unusual names or domains may require choosing their built-in banner manually.
+
 ## v0.0.3-alpha — Build #1
 
 - Added a fast Fluent-inspired startup splash and kept startup provider-free: no WebView, service navigation, or provider contact occurs until a service is selected.

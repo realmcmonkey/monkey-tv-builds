@@ -8,9 +8,28 @@ static void Require(bool condition, string message)
 }
 
 PortablePaths.EnsureCreated();
-Require(App.DisplayVersion == "0.0.3-alpha", "Release version metadata is incorrect.");
+Require(App.DisplayVersion == "0.04-alpha", "Release version metadata is incorrect.");
 Require(App.BuildNumber == "1", "Build #1 metadata is incorrect.");
-Require(App.AlphaWarningKey == "0.0.3-alpha-build-1", "Alpha warning is not keyed to v0.0.3 Build #1.");
+Require(App.AlphaWarningKey == "0.04-alpha-build-1", "Alpha warning is not keyed to v0.04 Build #1.");
+Require(NordLocationCatalog.All.Count >= 3, "Nord location catalog is missing documented presets.");
+Require(NordLocationCatalog.Get(NordLocationId.UnitedStates).Host == "us.socks.nordhold.net", "Documented Nord US SOCKS host changed unexpectedly.");
+var locationSettings = new MonkeySettings { LastUsedNordLocation = NordLocationId.NewYork };
+var locationStore = new SettingsStore(); locationStore.Save(locationSettings);
+Require(locationStore.Load().LastUsedNordLocation == NordLocationId.NewYork, "Last used Nord location did not persist as a convenience setting.");
+locationSettings.CurrentLocationEnabled = true; locationStore.Save(locationSettings);
+Require(locationStore.Load().CurrentLocationEnabled, "Current Location Home visibility preference did not persist.");
+await using (var directRouter = new CurrentLocationRouter())
+{
+    Require(directRouter.State == CurrentLocationState.Direct && directRouter.ActiveLocation is null, "Current Location does not begin Direct.");
+    Require(directRouter.EnsureGateway() > 0, "Loopback gateway did not receive a local port.");
+    await directRouter.SelectDirectAsync();
+    Require(directRouter.State == CurrentLocationState.Direct, "Direct selection did not restore Direct state.");
+}
+Require(BuiltInArtworkCatalog.All.Count == 46, "The built-in artwork catalog is incomplete.");
+Require(BuiltInArtworkCatalog.All.Select(item => item.Reference).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 46, "Built-in artwork references are not unique.");
+Require(BuiltInArtworkCatalog.FindBestMatch("Disney+", "https://www.disneyplus.com/")?.Name == "Disney+", "Disney+ default artwork matching failed.");
+Require(BuiltInArtworkCatalog.FindBestMatch("YouTube TV", "https://tv.youtube.com/")?.Name == "YouTube TV", "YouTube TV default artwork matching failed.");
+Require(BuiltInArtworkCatalog.TryGet("builtin:general/netflix")?.Name == "Netflix", "Built-in artwork lookup failed.");
 
 var legacyId = Guid.NewGuid();
 var legacyJson = $$"""
@@ -126,8 +145,10 @@ Require(!serialized.Contains("UserAgentMode", StringComparison.Ordinal), "Migrat
 Require(!serialized.Contains("CustomUserAgent\"", StringComparison.Ordinal), "Migrated legacy custom field was written back to settings.");
 
 restoredTv.BannerFit = BannerFit.Fit;
+restoredTv.BannerPath = "builtin:general/youtube-tv";
 store.Save(reloaded);
 Require(store.Load().Services.Single(s => s.Id == restoredTv.Id).BannerFit == BannerFit.Fit, "Banner Fit did not persist.");
+Require(store.Load().Services.Single(s => s.Id == restoredTv.Id).BannerPath == "builtin:general/youtube-tv", "Built-in artwork selection did not persist.");
 Require(PrereleaseVersion.Compare("v0.0.2-alpha", "v0.0.1-alpha") > 0, "Prerelease version comparison failed.");
 Require(PrereleaseVersion.Compare("v1.0.0", "v1.0.0-beta") > 0, "Stable version should sort after its prerelease.");
 
@@ -142,6 +163,7 @@ using (var archive = ZipFile.OpenRead(backupFile))
 }
 var preview = BackupService.Validate(backupFile);
 Require(preview.Settings.Services.Count == reloaded.Services.Count, "Backup validation lost services.");
+Require(preview.Settings.Services.Single(s => s.Id == restoredTv.Id).BannerPath == "builtin:general/youtube-tv", "Backup validation lost a built-in artwork reference.");
 var importedSettings = BackupService.Import(preview, store);
 Require(importedSettings.Services.Count == reloaded.Services.Count, "Backup import lost services.");
 Require(File.Exists(Path.Combine(sensitiveProfile, "cookie-secret.test")), "Configuration import unexpectedly modified browser profile data.");

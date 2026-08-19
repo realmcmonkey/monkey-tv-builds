@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Diagnostics;
 
 namespace MonkeyTV;
 
@@ -45,9 +46,42 @@ public partial class SetupWindow : Window
         _settings.ShowServiceNames = ShowNamesCheck.IsChecked == true;
         _settings.ShowClock = ShowClockCheck.IsChecked == true;
         _store.Save(_settings);
-        AppearanceStep.Visibility = Visibility.Collapsed; FinishStep.Visibility = Visibility.Visible;
+        AppearanceStep.Visibility = Visibility.Collapsed; LocationStep.Visibility = Visibility.Visible;
         Step2Label.Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush");
         Step3Label.Foreground = (System.Windows.Media.Brush)FindResource("TextBrush");
+    }
+
+    private void SetUpLocation_Click(object sender, RoutedEventArgs e)
+    {
+        LocationStep.Visibility = Visibility.Collapsed; LocationCredentialsStep.Visibility = Visibility.Visible;
+    }
+
+    private void SkipLocation_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.CurrentLocationEnabled = false; _store.Save(_settings); ShowFinish();
+    }
+
+    private void SaveLocationCredentials_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            NordCredentialStore.Save(NordUsernameBox.Text, NordPasswordBox.Password);
+            _settings.CurrentLocationEnabled = true; _store.Save(_settings); ShowFinish();
+        }
+        catch (Exception ex) { NordSetupStatus.Text = "Could not save service credentials: " + ex.Message; }
+    }
+
+    private void GetNordCredentials_Click(object sender, RoutedEventArgs e)
+    {
+        try { Process.Start(new ProcessStartInfo("https://support.nordvpn.com/hc/en-us/articles/19685375790865-NordVPN-Proxy-servers-explained") { UseShellExecute = true }); }
+        catch { }
+    }
+
+    private void ShowFinish()
+    {
+        LocationStep.Visibility = Visibility.Collapsed; LocationCredentialsStep.Visibility = Visibility.Collapsed; FinishStep.Visibility = Visibility.Visible;
+        Step3Label.Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush");
+        Step4Label.Foreground = (System.Windows.Media.Brush)FindResource("TextBrush");
     }
 
     private void OpenMonkeyTV_Click(object sender, RoutedEventArgs e)

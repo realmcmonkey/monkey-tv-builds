@@ -40,12 +40,9 @@
         <Grid x:Name="HomeHeader" Margin="46,30,46,20">
           <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
           <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Border Width="42" Height="42" CornerRadius="13" Margin="0,0,15,0">
-              <Border.Background>
-                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#FF8C70FF"/><GradientStop Color="#FF6547DE" Offset="1"/></LinearGradientBrush>
-              </Border.Background>
+            <Border Width="42" Height="42" CornerRadius="13" Margin="0,0,15,0" Background="Black" ClipToBounds="True">
               <Border.Effect><DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.28" Color="#FF6B4CE6"/></Border.Effect>
-              <TextBlock Text="M" Foreground="{DynamicResource AccentTextBrush}" FontSize="19" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+              <Image Source="Assets/Brand/monkey-tv-logo.jpg" Stretch="UniformToFill"/>
             </Border>
             <StackPanel VerticalAlignment="Center">
               <TextBlock Text="Monkey TV" FontSize="23" FontWeight="SemiBold"/>
@@ -65,6 +62,9 @@
             </Button>
             <Button x:Name="HeaderAddServiceButton" Padding="12,8" Background="Transparent" Click="AddService_Click" ToolTip="Add service" Margin="0,0,4,0">
               <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="0,1,7,0"/><TextBlock Text="Add service" FontSize="13"/></StackPanel>
+            </Button>
+            <Button x:Name="CurrentLocationButton" Padding="12,8" Background="{DynamicResource SurfaceBrush}" Click="CurrentLocation_Click" ToolTip="Choose the route used by Monkey TV websites" Margin="0,0,8,0">
+              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE774;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="0,1,7,0"/><TextBlock x:Name="CurrentLocationText" Text="Direct" FontSize="13"/></StackPanel>
             </Button>
             <TextBlock x:Name="ClockText" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,16,0"/>
             <Button Width="38" Height="38" Padding="0" Background="{DynamicResource SurfaceBrush}" Click="Settings_Click" ToolTip="Settings" Margin="0,0,8,0">

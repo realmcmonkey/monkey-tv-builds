@@ -8,8 +8,8 @@
     <Grid>
       <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
       <StackPanel>
-        <Border Width="46" Height="46" CornerRadius="12" Background="{DynamicResource AccentBrush}" HorizontalAlignment="Left">
-          <TextBlock Text="M" FontSize="23" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        <Border Width="46" Height="46" CornerRadius="12" Background="Black" ClipToBounds="True" HorizontalAlignment="Left">
+          <Image Source="Assets/Brand/monkey-tv-logo.jpg" Stretch="UniformToFill"/>
         </Border>
         <TextBlock x:Name="VersionText" Margin="0,20,0,0" FontSize="24" FontWeight="SemiBold"/>
         <TextBlock Margin="0,12,0,0" Foreground="{StaticResource MutedBrush}" FontSize="14" TextWrapping="Wrap" LineHeight="21"
