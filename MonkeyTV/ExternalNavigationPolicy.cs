@@ -1,9 +1,11 @@
 using System.Diagnostics;
+using System.Windows;
 
 namespace MonkeyTV;
 
 public static class ExternalNavigationPolicy
 {
+    public static bool AskBeforeOpening { get; set; }
     public static bool IsRelatedOrAuthentication(Uri? current, Uri target)
     {
         if (current is not null && (HostContains(current.Host, target.Host) || HostContains(target.Host, current.Host))) return true;
@@ -25,7 +27,12 @@ public static class ExternalNavigationPolicy
     internal static void OpenInDefaultBrowser(string? value)
     {
         if (!TryHttpUri(value, out var uri)) return;
-        try { Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true }); }
+        try
+        {
+            if (AskBeforeOpening && MessageBox.Show($"Open {uri.Host} in your Windows default browser?", "Open external link", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+            Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+        }
         catch (Exception ex) { AppLog.Write("external-link", ex.Message); }
     }
 

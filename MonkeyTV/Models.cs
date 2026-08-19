@@ -10,6 +10,10 @@ public enum BannerFit { Fill, Fit }
 public enum BrowserStorageMode { LegacyIsolated, SharedProfile, UnifiedSharedProfile }
 public enum AppTheme { System, Light, Dark }
 public enum AppAccent { System, Blue, Purple, Green, Orange, Red }
+public enum StartupMode { Home, LastService }
+public enum CloseBehavior { Exit, AskBeforeExiting }
+public enum MotionPreference { System, Full, Reduced }
+public enum ExternalLinkBehavior { DefaultBrowser, AskFirst }
 public enum ServiceSorting { Custom, AlphabeticalAscending, AlphabeticalDescending, RecentlyAddedNewest, RecentlyAddedOldest }
 public enum CurrentLocationState { Direct, Connecting, Connected, Failed }
 public enum NordLocationId { UnitedStates, Netherlands, Sweden, Atlanta, Chicago, Dallas, LosAngeles, NewYork, Phoenix, SanFrancisco, Stockholm, Amsterdam }
@@ -57,6 +61,13 @@ public sealed class MonkeySettings
     public bool ShowClock { get; set; } = true;
     public AppTheme Theme { get; set; } = AppTheme.System;
     public AppAccent Accent { get; set; } = AppAccent.System;
+    public StartupMode StartupMode { get; set; } = StartupMode.Home;
+    public bool StartupFullscreen { get; set; }
+    public CloseBehavior CloseBehavior { get; set; } = CloseBehavior.Exit;
+    public MotionPreference Motion { get; set; } = MotionPreference.System;
+    public ServiceExperience DefaultCustomServiceExperience { get; set; } = ServiceExperience.Default;
+    public ExternalLinkBehavior ExternalLinkBehavior { get; set; } = ExternalLinkBehavior.DefaultBrowser;
+    public Guid? LastServiceId { get; set; }
     public double? WindowLeft { get; set; }
     public double? WindowTop { get; set; }
     public double? WindowWidth { get; set; }

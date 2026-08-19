@@ -14,14 +14,15 @@ public partial class ServiceEditorWindow : Window
     public bool ClearDataRequested { get; private set; }
     public ServiceDefinition Result => _service;
 
-    public ServiceEditorWindow(ServiceDefinition? existing = null)
+    public ServiceEditorWindow(ServiceDefinition? existing = null, ServiceExperience defaultExperience = ServiceExperience.Default)
     {
         InitializeComponent();
         _isNew = existing is null;
         // WebView2 cannot safely clear every storage category by a configured-service name.
         // Never wipe the shared profile as a side effect of editing one service.
         ClearDataButton.IsEnabled = false;
-        _service = existing is null ? new ServiceDefinition() : Clone(existing);
+        _service = existing is null ? new ServiceDefinition { Experience = defaultExperience } : Clone(existing);
+        if (existing is null) ExperienceBox.SelectedIndex = defaultExperience == ServiceExperience.TV ? 1 : 0;
         if (existing is not null)
         {
             Heading.Text = "Edit service"; SaveButton.Content = "Save changes";

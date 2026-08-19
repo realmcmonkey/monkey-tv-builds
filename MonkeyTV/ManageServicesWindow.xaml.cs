@@ -43,7 +43,7 @@ public partial class ManageServicesWindow : Window
 
     private void AddCustom_Click(object sender, RoutedEventArgs e)
     {
-        var editor = new ServiceEditorWindow { Owner = this };
+        var editor = new ServiceEditorWindow(defaultExperience: _settings.DefaultCustomServiceExperience) { Owner = this };
         if (editor.ShowDialog() == true) _pendingCustom.Add(editor.Result);
     }
 

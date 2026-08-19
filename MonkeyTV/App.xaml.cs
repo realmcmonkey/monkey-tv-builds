@@ -90,6 +90,7 @@ public partial class App : Application
                 }
                 startup.Stop();
                 LastStartupMilliseconds = startup.ElapsedMilliseconds;
+                main.ApplyStartupPreferences();
             };
             main.Show();
         }

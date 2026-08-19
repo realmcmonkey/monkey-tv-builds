@@ -63,6 +63,7 @@ public partial class MainWindow : Window
     public MainWindow(MonkeySettings settings, SettingsStore store)
     {
         InitializeComponent(); _settings = settings; _store = store;
+        ExternalNavigationPolicy.AskBeforeOpening = _settings.ExternalLinkBehavior == ExternalLinkBehavior.AskFirst;
         _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _clockTimer.Tick += (_, _) => ClockText.Text = DateTime.Now.ToString("h:mm tt");
         _clockTimer.Start();
@@ -335,6 +336,13 @@ public partial class MainWindow : Window
 
     private static void AnimateCard(ScaleTransform scale, TranslateTransform lift, DropShadowEffect shadow, double targetScale, double targetY, double blur, double opacity)
     {
+        if (ThemeService.ReduceMotion)
+        {
+            scale.BeginAnimation(ScaleTransform.ScaleXProperty, null); scale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+            lift.BeginAnimation(TranslateTransform.YProperty, null); shadow.BeginAnimation(DropShadowEffect.BlurRadiusProperty, null); shadow.BeginAnimation(DropShadowEffect.OpacityProperty, null);
+            scale.ScaleX = scale.ScaleY = targetScale; lift.Y = targetY; shadow.BlurRadius = blur; shadow.Opacity = opacity;
+            return;
+        }
         var duration = new Duration(TimeSpan.FromMilliseconds(140));
         var easing = new QuadraticEase { EasingMode = EasingMode.EaseOut };
         scale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(targetScale, duration) { EasingFunction = easing });
@@ -433,6 +441,11 @@ public partial class MainWindow : Window
     {
         // Any service selection supersedes a still-pending Home suspension request.
         ++_homeSuspensionGeneration;
+        if (_settings.LastServiceId != service.Id)
+        {
+            _settings.LastServiceId = service.Id;
+            _store.Save(_settings);
+        }
         if (_activeServiceId == service.Id && (_webView is not null || _isBrowserLaunching))
         {
             HomeView.Visibility = Visibility.Collapsed;
@@ -1064,7 +1077,7 @@ public partial class MainWindow : Window
 
     private void AddService_Click(object sender, RoutedEventArgs e)
     {
-        var editor = new ServiceEditorWindow { Owner = this };
+        var editor = new ServiceEditorWindow(defaultExperience: _settings.DefaultCustomServiceExperience) { Owner = this };
         if (editor.ShowDialog() != true) return;
         _settings.Services.Add(editor.Result); _store.Save(_settings); RenderHome();
     }
@@ -1257,6 +1270,13 @@ public partial class MainWindow : Window
         catch (Exception ex) { AppLog.Write("storage", ex.Message); }
     }
 
+    internal async Task ResetAllWebsiteDataAsync()
+    {
+        try { if (_webView?.CoreWebView2?.Profile is { } profile) await profile.ClearBrowsingDataAsync(); }
+        catch (Exception ex) { AppLog.Write("storage", "WebView2 browsing-data reset: " + ex.Message); }
+        ClearAllBrowserData();
+    }
+
     internal void ResetMonkeyTv()
     {
         DestroyBrowser();
@@ -1273,6 +1293,11 @@ public partial class MainWindow : Window
     private async void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
         if (_allowClose) return;
+        if (!_closing && _settings.CloseBehavior == CloseBehavior.AskBeforeExiting)
+        {
+            var confirmation = new ConfirmWindow("Exit Monkey TV?", "Your current service will close. Monkey TV will safely save its settings before exiting.", "Exit") { Owner = this };
+            if (confirmation.ShowDialog() != true) { e.Cancel = true; return; }
+        }
         e.Cancel = true;
         if (_closing) return;
         _closing = true;
@@ -1306,6 +1331,14 @@ public partial class MainWindow : Window
     }
 
     internal void ToggleApplicationFullscreen() => SetApplicationFullscreen(!_appFullscreen);
+
+    internal void ApplyStartupPreferences()
+    {
+        if (_settings.StartupFullscreen) SetApplicationFullscreen(true);
+        if (_settings.StartupMode == StartupMode.LastService && _settings.LastServiceId is { } id &&
+            _settings.Services.FirstOrDefault(service => service.Id == id) is { } service)
+            Dispatcher.BeginInvoke(new Action(() => _ = OpenServiceAsync(service)), DispatcherPriority.ApplicationIdle);
+    }
 
     private void SetApplicationFullscreen(bool value)
     {

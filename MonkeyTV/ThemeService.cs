@@ -42,6 +42,9 @@ internal static class ThemeService
         Set(resources, "HomeGlowBrush", Color.FromArgb(light ? (byte)22 : (byte)36, accent.R, accent.G, accent.B));
     }
 
+    internal static bool ReduceMotion => _settings?.Motion == MotionPreference.Reduced ||
+        (_settings?.Motion == MotionPreference.System && !SystemParameters.ClientAreaAnimation);
+
     private static void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
     {
         if (_settings?.Theme != AppTheme.System) return;
