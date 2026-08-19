@@ -16,6 +16,10 @@ public static class ExternalNavigationPolicy
                host.StartsWith("auth.") || host.StartsWith("id.") || host.StartsWith("accounts.");
     }
 
+    public static bool IsAmbiguousAuthenticationRedirect(Uri? service, Uri? current, Uri target) =>
+        (service is not null && IsRelatedOrAuthentication(service, target)) ||
+        (current is not null && IsRelatedOrAuthentication(current, target));
+
     public static bool TryHttpUri(string? value, out Uri uri)
     {
         var valid = Uri.TryCreate(value, UriKind.Absolute, out var parsed) &&

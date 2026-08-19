@@ -9,8 +9,8 @@ static void Require(bool condition, string message)
 
 PortablePaths.EnsureCreated();
 Require(App.DisplayVersion == "0.04-alpha", "Release version metadata is incorrect.");
-Require(App.BuildNumber == "4", "Build #4 metadata is incorrect.");
-Require(App.AlphaWarningKey == "0.04-alpha-build-4", "Alpha warning is not keyed to v0.04 Build #4.");
+Require(App.BuildNumber == "5", "Build #5 metadata is incorrect.");
+Require(App.AlphaWarningKey == "0.04-alpha-build-5", "Alpha warning is not keyed to v0.04 Build #5.");
 Require(NordLocationCatalog.All.Count >= 3, "Nord location catalog is missing documented presets.");
 Require(NordLocationCatalog.Get(NordLocationId.UnitedStates).Host == "us.socks.nordhold.net", "Documented Nord US SOCKS host changed unexpectedly.");
 var locationSettings = new MonkeySettings { LastUsedNordLocation = NordLocationId.NewYork };
@@ -26,8 +26,14 @@ await using (var directRouter = new CurrentLocationRouter())
     Require(directRouter.State == CurrentLocationState.Direct, "Direct selection did not restore Direct state.");
 }
 Require(BuiltInArtworkCatalog.All.Count == 46, "The built-in artwork catalog is incomplete.");
-Require(BuiltInServiceCatalog.All.Count == BuiltInArtworkCatalog.All.Count, "Manage Services does not match the bundled artwork library.");
+Require(BuiltInServiceCatalog.All.Count >= BuiltInArtworkCatalog.All.Count, "Manage Services is missing bundled artwork choices.");
 Require(BuiltInServiceCatalog.All.All(service => BuiltInArtworkCatalog.TryGet(service.ArtworkReference) is not null), "A built-in service has no bundled artwork.");
+
+var builtInYouTubeDesktop = BuiltInServiceCatalog.Find("general/youtube") ?? throw new InvalidOperationException("YouTube Desktop built-in definition is missing.");
+var builtInYouTubeSmartTv = BuiltInServiceCatalog.Find("general/youtube-smart-tv") ?? throw new InvalidOperationException("YouTube Smart TV built-in definition is missing.");
+Require(builtInYouTubeDesktop.Url == "https://www.youtube.com/" && builtInYouTubeDesktop.Experience == ServiceExperience.Default, "YouTube Desktop defaults are incorrect.");
+Require(builtInYouTubeSmartTv.Url == "https://www.youtube.com/tv" && builtInYouTubeSmartTv.Experience == ServiceExperience.TV, "YouTube Smart TV defaults are incorrect.");
+Require(builtInYouTubeDesktop.Id != builtInYouTubeSmartTv.Id, "YouTube built-ins must have separate stable IDs.");
 
 var builtInYouTubeTv = BuiltInServiceCatalog.Find("general/youtube-tv") ?? throw new InvalidOperationException("YouTube TV built-in definition is missing.");
 var builtInCopy = builtInYouTubeTv.Create();
@@ -114,6 +120,8 @@ foreach (var accent in Enum.GetValues<AppAccent>())
 Require(ExternalNavigationPolicy.TryHttpUri("https://example.test/path", out _), "Safe HTTPS URL was rejected.");
 Require(!ExternalNavigationPolicy.TryHttpUri("file:///private.txt", out _), "Non-web popup URL was accepted.");
 Require(ExternalNavigationPolicy.IsRelatedOrAuthentication(new Uri("https://video.example.test"), new Uri("https://auth.example.test/login")), "Related authentication popup was not recognized.");
+Require(ExternalNavigationPolicy.IsAmbiguousAuthenticationRedirect(new Uri("https://www.paramountplus.com/"), null, new Uri("https://www.paramountplus.com/account/flow/f-upsell/action/login/")), "Provider login redirect was not classified as ambiguous.");
+Require(!ExternalNavigationPolicy.IsAmbiguousAuthenticationRedirect(new Uri("https://www.paramountplus.com/"), null, new Uri("https://unrelated.example.test/")), "Unrelated navigation was incorrectly classified as authentication.");
 
 var sourceBanner = Path.Combine(PortablePaths.CacheDirectory, "manual-banner.png");
 var bannerBytes = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");

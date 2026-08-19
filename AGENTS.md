@@ -55,6 +55,7 @@ Monkey TV is a legitimate streaming-site launcher, never a content host or DRM w
 - Building, running, debugging, and testing locally is allowed during development.
 - Publishing, pushing, uploading, packaging a distributable, or creating/updating a release requires explicit user instruction for that specific development state.
 - Do not automatically publish after every development prompt. Multiple development prompts may be completed before the user requests a new test or release build.
+- Keep `CHANGELOG.md` current for every build. GitHub release notes should be a short plain-English summary with a clear link to the detailed changelog.
 
 ## Final build location
 

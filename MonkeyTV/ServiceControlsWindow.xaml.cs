@@ -107,6 +107,13 @@ public partial class ServiceControlsWindow : Window
         }));
     }
     private void Fullscreen_Click(object sender, RoutedEventArgs e) { UserActivity?.Invoke(this, EventArgs.Empty); FullscreenRequested?.Invoke(this, EventArgs.Empty); }
+    private void More_Click(object sender, RoutedEventArgs e)
+    {
+        UserActivity?.Invoke(this, EventArgs.Empty);
+        if (MoreButton.ContextMenu is not { } menu) return;
+        menu.PlacementTarget = MoreButton;
+        menu.IsOpen = true;
+    }
     private void Restart_Click(object sender, RoutedEventArgs e) { UserActivity?.Invoke(this, EventArgs.Empty); RestartRequested?.Invoke(this, EventArgs.Empty); }
     private void ResetSiteData_Click(object sender, RoutedEventArgs e) { UserActivity?.Invoke(this, EventArgs.Empty); ResetSiteDataRequested?.Invoke(this, EventArgs.Empty); }
 }

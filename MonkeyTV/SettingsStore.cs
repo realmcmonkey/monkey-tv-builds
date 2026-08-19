@@ -52,6 +52,16 @@ public sealed class SettingsStore
         }
         foreach (var service in settings.Services)
         {
+            // Build #5 renamed only the untouched legacy built-in YouTube template so the
+            // desktop and Smart TV entries are unambiguous. Any edited/custom service is left
+            // exactly as the user configured it.
+            if (service.BuiltInServiceId == "general/youtube" && service.BuiltInDefinitionRevision < 2 &&
+                service.Name == "YouTube" && service.Url == "https://www.youtube.com/" &&
+                service.BannerPath == "builtin:general/youtube" && service.Experience == ServiceExperience.Default)
+            {
+                BuiltInServiceCatalog.RestoreDefaults(service, BuiltInServiceCatalog.Find("general/youtube")!);
+                changed = true;
+            }
             if (service.AddedUtc == default)
             {
                 service.AddedUtc = DateTime.UtcNow;

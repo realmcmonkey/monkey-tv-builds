@@ -29,7 +29,7 @@
       </Button>
       <Border Width="1" Height="23" Background="#35FFFFFF" Margin="7,0" VerticalAlignment="Center"/>
       <Button x:Name="FullscreenButton" Style="{StaticResource OverlayButton}" Content="&#xE740;" ToolTip="Toggle application fullscreen (F11)" Click="Fullscreen_Click"/>
-      <Button Style="{StaticResource OverlayButton}" Content="&#xE712;" ToolTip="More service actions">
+      <Button x:Name="MoreButton" Style="{StaticResource OverlayButton}" Content="&#xE712;" ToolTip="More service actions" Focusable="True" Click="More_Click">
         <Button.ContextMenu>
           <ContextMenu>
             <MenuItem Header="Restart Service" Click="Restart_Click"/>

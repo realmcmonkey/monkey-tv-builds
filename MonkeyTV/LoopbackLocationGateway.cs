@@ -11,12 +11,23 @@ internal sealed class LoopbackLocationGateway : IAsyncDisposable
     private readonly CancellationTokenSource _stop = new();
     private Task? _acceptLoop;
     private GatewayRoute _route = GatewayRoute.Direct;
+    // A route change must not leave an old upstream SOCKS stream alive. New browser requests
+    // receive a fresh route token; in-flight requests are cancelled and reconnect normally.
+    private CancellationTokenSource _routeConnections = new();
 
     public int Port => ((IPEndPoint)_listener.LocalEndpoint).Port;
     public void Start() { _listener.Start(); _acceptLoop = AcceptLoopAsync(_stop.Token); }
-    public void SetDirect() => Volatile.Write(ref _route, GatewayRoute.Direct);
-    public void SetDeny() => Volatile.Write(ref _route, GatewayRoute.Deny);
-    public void SetNord(NordLocation location, NordCredentials credentials) => Volatile.Write(ref _route, new GatewayRoute(location, credentials));
+    public void SetDirect() => ChangeRoute(GatewayRoute.Direct);
+    public void SetDeny() => ChangeRoute(GatewayRoute.Deny);
+    public void SetNord(NordLocation location, NordCredentials credentials) => ChangeRoute(new GatewayRoute(location, credentials));
+
+    private void ChangeRoute(GatewayRoute route)
+    {
+        Volatile.Write(ref _route, route);
+        var previous = Interlocked.Exchange(ref _routeConnections, new CancellationTokenSource());
+        previous.Cancel();
+        // Do not dispose immediately: an in-flight handler may still be observing its token.
+    }
 
     public async Task VerifyAsync(CancellationToken cancellationToken)
     {
@@ -38,26 +49,28 @@ internal sealed class LoopbackLocationGateway : IAsyncDisposable
         using (client)
         try
         {
+            using var routeCancellation = CancellationTokenSource.CreateLinkedTokenSource(token, Volatile.Read(ref _routeConnections).Token);
+            var routeToken = routeCancellation.Token;
             using var browser = client.GetStream();
-            var header = await ReadHeaderAsync(browser, token);
+            var header = await ReadHeaderAsync(browser, routeToken);
             if (header is null) return;
             var first = header.Split("\r\n", 2)[0].Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
             if (first.Length < 2) return;
-            if (!TryParseRequest(first, out var host, out var port, out var rewrittenStart)) { await RespondAsync(browser, 400, "Bad proxy request", token); return; }
+            if (!TryParseRequest(first, out var host, out var port, out var rewrittenStart)) { await RespondAsync(browser, 400, "Bad proxy request", routeToken); return; }
             var route = Volatile.Read(ref _route);
-            if (route.IsDeny) { await RespondAsync(browser, 502, "Location is changing", token); return; }
+            if (route.IsDeny) { await RespondAsync(browser, 502, "Location is changing", routeToken); return; }
             try
             {
-                using var upstream = await ConnectAsync(route, host, port, token);
+                using var upstream = await ConnectAsync(route, host, port, routeToken);
                 using var target = upstream.GetStream();
                 if (first[0].Equals("CONNECT", StringComparison.OrdinalIgnoreCase))
-                    await browser.WriteAsync("HTTP/1.1 200 Connection Established\r\n\r\n"u8.ToArray(), token);
+                    await browser.WriteAsync("HTTP/1.1 200 Connection Established\r\n\r\n"u8.ToArray(), routeToken);
                 else
-                    await target.WriteAsync(Encoding.ASCII.GetBytes(rewrittenStart + "\r\n" + header[(header.IndexOf("\r\n", StringComparison.Ordinal) + 2)..]), token);
-                await Task.WhenAny(browser.CopyToAsync(target, token), target.CopyToAsync(browser, token));
+                    await target.WriteAsync(Encoding.ASCII.GetBytes(rewrittenStart + "\r\n" + header[(header.IndexOf("\r\n", StringComparison.Ordinal) + 2)..]), routeToken);
+                await Task.WhenAny(browser.CopyToAsync(target, routeToken), target.CopyToAsync(browser, routeToken));
             }
             catch (Exception ex) when (ex is SocketException or IOException or InvalidOperationException or TimeoutException)
-            { await RespondAsync(browser, 502, "Location route unavailable", token); }
+            { await RespondAsync(browser, 502, "Location route unavailable", routeToken); }
         }
         catch (OperationCanceledException) { } catch (IOException) { } catch (ObjectDisposedException) { }
     }
@@ -115,7 +128,7 @@ internal sealed class LoopbackLocationGateway : IAsyncDisposable
         var data = new byte[count]; var offset = 0; while (offset < count) { var read = await stream.ReadAsync(data.AsMemory(offset), token); if (read == 0) throw new IOException("Unexpected end of SOCKS5 response."); offset += read; } return data;
     }
     private static Task RespondAsync(NetworkStream stream, int code, string text, CancellationToken token) => stream.WriteAsync(Encoding.ASCII.GetBytes($"HTTP/1.1 {code} {text}\r\nConnection: close\r\n\r\n"), token).AsTask();
-    public async ValueTask DisposeAsync() { _stop.Cancel(); _listener.Stop(); if (_acceptLoop is not null) try { await _acceptLoop; } catch { } _stop.Dispose(); }
+    public async ValueTask DisposeAsync() { _routeConnections.Cancel(); _stop.Cancel(); _listener.Stop(); if (_acceptLoop is not null) try { await _acceptLoop; } catch { } _routeConnections.Dispose(); _stop.Dispose(); }
     private sealed record GatewayRoute(NordLocation? Location, NordCredentials? Credentials, bool IsDeny = false)
     { public static GatewayRoute Direct { get; } = new(null, null); public static GatewayRoute Deny { get; } = new(null, null, true); }
 }

@@ -54,6 +54,7 @@ public partial class MainWindow : Window
     private bool _serviceNavigationLoading;
     private string? _lastNavigationUrl;
     private string? _lastErrorDiagnostic;
+    private readonly HashSet<ulong> _ambiguousAuthenticationNavigationIds = new();
     private Point _dragStart;
     private Button? _dragSource;
     private Button? _dragOverCard;
@@ -134,7 +135,7 @@ public partial class MainWindow : Window
     private Button CreateTile(ServiceDefinition service)
     {
         var (width, height) = GetHomeCardSize();
-        const bool banner = true;
+        var banner = _settings.CardStyle == ServiceCardStyle.Banner;
 
         var button = new Button
         {
@@ -155,13 +156,14 @@ public partial class MainWindow : Window
         button.Effect = shadow;
 
         var content = new StackPanel();
+        var cardBorder = new SolidColorBrush(Color.FromArgb(42, 255, 255, 255));
         var card = new Border
         {
             Width = width,
             Height = height,
             CornerRadius = new CornerRadius(banner ? 16 : 18),
             Background = CreateCardBackground(service),
-            BorderBrush = new SolidColorBrush(Color.FromArgb(32, 255, 255, 255)),
+            BorderBrush = cardBorder,
             BorderThickness = new Thickness(1),
             ClipToBounds = true
         };
@@ -182,8 +184,18 @@ public partial class MainWindow : Window
         }
 
         button.Content = content;
-        button.MouseEnter += (_, _) => AnimateCard(scale, lift, shadow, 1.02, -3, 24, .44);
-        button.MouseLeave += (_, _) => AnimateCard(scale, lift, shadow, 1, 0, 18, .32);
+        var hovered = false;
+        var focused = false;
+        void UpdateCardHighlight()
+        {
+            var highlighted = hovered || focused;
+            AnimateCard(scale, lift, shadow, highlighted ? 1.02 : 1, highlighted ? -3 : 0, highlighted ? 25 : 18, highlighted ? .48 : .32);
+            AnimateCardBorder(cardBorder, highlighted);
+        }
+        button.MouseEnter += (_, _) => { hovered = true; UpdateCardHighlight(); };
+        button.MouseLeave += (_, _) => { hovered = false; UpdateCardHighlight(); };
+        button.GotKeyboardFocus += (_, _) => { focused = true; UpdateCardHighlight(); };
+        button.LostKeyboardFocus += (_, _) => { focused = false; UpdateCardHighlight(); };
         if (_settings.ServiceSorting == ServiceSorting.Custom)
         {
             button.PreviewMouseLeftButtonDown += ServiceCard_MouseLeftButtonDown;
@@ -202,7 +214,7 @@ public partial class MainWindow : Window
         var width = (available - 20 * (columns - 1)) / columns;
         var (minimum, maximum) = _settings.TileSize switch { TileSize.Small => (180d, 240d), TileSize.Large => (250d, 350d), _ => (220d, 310d) };
         width = Math.Clamp(width, minimum, maximum);
-        return (Math.Floor(width), Math.Floor(width * 9 / 16));
+        return (Math.Floor(width), Math.Floor(_settings.CardStyle == ServiceCardStyle.Banner ? width * 9 / 16 : width));
     }
 
     private Grid CreateCardArtwork(ServiceDefinition service, double width, double height, bool banner)
@@ -350,6 +362,22 @@ public partial class MainWindow : Window
         lift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(targetY, duration) { EasingFunction = easing });
         shadow.BeginAnimation(DropShadowEffect.BlurRadiusProperty, new DoubleAnimation(blur, duration) { EasingFunction = easing });
         shadow.BeginAnimation(DropShadowEffect.OpacityProperty, new DoubleAnimation(opacity, duration) { EasingFunction = easing });
+    }
+
+    private static void AnimateCardBorder(SolidColorBrush border, bool highlighted)
+    {
+        var accent = Application.Current.Resources["AccentBrush"] as SolidColorBrush;
+        var target = highlighted && accent is not null
+            ? Color.FromArgb(150, accent.Color.R, accent.Color.G, accent.Color.B)
+            : Color.FromArgb(42, 255, 255, 255);
+        if (ThemeService.ReduceMotion)
+        {
+            border.BeginAnimation(SolidColorBrush.ColorProperty, null);
+            border.Color = target;
+            return;
+        }
+        border.BeginAnimation(SolidColorBrush.ColorProperty,
+            new ColorAnimation(target, TimeSpan.FromMilliseconds(150)) { EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut } });
     }
 
     private void HomeScroll_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -574,6 +602,15 @@ public partial class MainWindow : Window
                     return;
                 }
                 _lastNavigationUrl = SafeDiagnosticUrl(e.Uri);
+                // Some providers complete an intermediate account/login redirect with Unknown
+                // before the next redirect starts. Keep that narrow case alive for the next
+                // navigation instead of showing a false browser error over the login flow.
+                var current = ExternalNavigationPolicy.TryHttpUri(view.Source?.AbsoluteUri, out var currentUri) ? currentUri : null;
+                if (ExternalNavigationPolicy.TryHttpUri(e.Uri, out var navigationUri) &&
+                    ExternalNavigationPolicy.IsAmbiguousAuthenticationRedirect(
+                        ActiveService is { } active && ExternalNavigationPolicy.TryHttpUri(active.Url, out var serviceUri) ? serviceUri : null,
+                        current, navigationUri))
+                    _ambiguousAuthenticationNavigationIds.Add(e.NavigationId);
                 _serviceNavigationLoading = true;
                 UpdateNavigationControls(view);
                 if (_launchTransitionActive && _launchServiceId == _activeServiceId)
@@ -588,6 +625,7 @@ public partial class MainWindow : Window
             view.NavigationCompleted += (_, e) =>
             {
                 if (generation != _browserGeneration || !ReferenceEquals(_webView, view)) return;
+                var ambiguousAuthenticationRedirect = _ambiguousAuthenticationNavigationIds.Remove(e.NavigationId);
                 _serviceNavigationLoading = false;
                 Dispatcher.Invoke(() => UpdateNavigationControls(view));
                 if (_launchTransitionActive)
@@ -596,12 +634,17 @@ public partial class MainWindow : Window
                     // that stale completion instead of showing its failure against the new service.
                     if (_launchServiceId != _activeServiceId || _launchNavigationId != e.NavigationId) return;
                     if (e.IsSuccess) CompleteServiceLaunch(view);
+                    else if (e.WebErrorStatus == CoreWebView2WebErrorStatus.Unknown && ambiguousAuthenticationRedirect)
+                    {
+                        // Wait for the provider's follow-up redirect or the existing launch timeout.
+                    }
                     else if (ActiveService is { } launchingService)
                         ShowNavigationError(launchingService, e.WebErrorStatus, "WebView2 NavigationCompleted");
                     return;
                 }
 
                 if (!e.IsSuccess && e.WebErrorStatus.ToString() != "OperationCanceled" &&
+                    !(e.WebErrorStatus == CoreWebView2WebErrorStatus.Unknown && ambiguousAuthenticationRedirect) &&
                     BrowserView.Visibility == Visibility.Visible && ActiveService is { } active)
                     ShowNavigationError(active, e.WebErrorStatus, "WebView2 NavigationCompleted");
                 else if (e.IsSuccess)
@@ -1099,33 +1142,10 @@ public partial class MainWindow : Window
 
     private void CurrentLocation_Click(object sender, RoutedEventArgs e)
     {
-        var menu = new ContextMenu();
-        var direct = new MenuItem { Header = "🌐 Direct", IsCheckable = true, IsChecked = _locationRouter.State == CurrentLocationState.Direct };
-        direct.Click += async (_, _) => await ChangeLocationAsync(null);
-        menu.Items.Add(direct); menu.Items.Add(new Separator());
-        if (_locationRouter.State == CurrentLocationState.Failed && _locationRouter.RequestedLocation is { } failed)
-        {
-            var retry = new MenuItem { Header = "Retry " + failed.Name };
-            retry.Click += async (_, _) => await ChangeLocationAsync(failed);
-            menu.Items.Add(retry); menu.Items.Add(new Separator());
-        }
-        if (_settings.LastUsedNordLocation is { } last)
-        {
-            var previous = NordLocationCatalog.Get(last);
-            var item = new MenuItem { Header = "🌐 " + previous.Name + " — Last used" };
-            item.Click += async (_, _) => await ChangeLocationAsync(previous);
-            menu.Items.Add(item); menu.Items.Add(new Separator());
-        }
-        foreach (var location in NordLocationCatalog.All)
-        {
-            var item = new MenuItem { Header = "🌐 " + location.Name, IsCheckable = true, IsChecked = _locationRouter.ActiveLocation?.Id == location.Id };
-            item.Click += async (_, _) => await ChangeLocationAsync(location);
-            menu.Items.Add(item);
-        }
-        menu.Items.Add(new Separator());
-        var setup = new MenuItem { Header = "Set up NordVPN…" };
-        setup.Click += (_, _) => Settings_Click(this, new RoutedEventArgs());
-        menu.Items.Add(setup); menu.PlacementTarget = CurrentLocationButton; menu.IsOpen = true;
+        var lastUsed = _settings.LastUsedNordLocation is { } last ? NordLocationCatalog.Get(last) : null;
+        var picker = new CurrentLocationPickerWindow(lastUsed) { Owner = this };
+        if (picker.ShowDialog() != true) return;
+        _ = ChangeLocationAsync(picker.SelectDirect ? null : picker.SelectedLocation);
     }
 
     private async Task ChangeLocationAsync(NordLocation? location)

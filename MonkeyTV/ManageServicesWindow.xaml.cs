@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media.Imaging;
 
 namespace MonkeyTV;
@@ -32,10 +33,13 @@ public partial class ManageServicesWindow : Window
         if (!_filtersReady || _items is null || SearchBox is null || RegionBox is null || ServicesList is null) return;
         var term = SearchBox.Text?.Trim() ?? "";
         var region = (RegionBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "All";
-        ServicesList.ItemsSource = _items.Where(item => (region == "All" || item.Template.Region == region) && item.Template.Name.Contains(term, StringComparison.CurrentCultureIgnoreCase)).ToList();
+        ServicesList.ItemsSource = _items
+            .Where(item => (region == "All" || item.Template.Region == region) && item.Template.Name.Contains(term, StringComparison.CurrentCultureIgnoreCase))
+            .OrderBy(item => item.Template.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
     }
     private void FilterChanged(object sender, RoutedEventArgs e) => Refresh();
-    private void ServiceChecked(object sender, RoutedEventArgs e) { if (sender is CheckBox { Tag: ManageServiceItem item }) item.RefreshStatus(); }
+    private void ServiceChecked(object sender, RoutedEventArgs e) { if (sender is ToggleButton { Tag: ManageServiceItem item }) item.RefreshStatus(); }
     private void ServicesList_SelectionChanged(object sender, SelectionChangedEventArgs e) { }
     private void EnableAll_Click(object sender, RoutedEventArgs e) { foreach (var item in _items) item.Enabled = true; Refresh(); }
     private void DisableAll_Click(object sender, RoutedEventArgs e) { foreach (var item in _items) item.Enabled = false; Refresh(); }

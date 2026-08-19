@@ -5,6 +5,29 @@
 - Added one local-only Choose / Manage Services library built from the bundled service artwork. It offers only providers with included artwork, supports bulk enable/disable, custom-service addition, conservative duplicate warnings, and Restore Defaults for customized built-in copies.
 - Added Settings → Home service sorting. Automatic sort modes preserve the stored Custom drag order; Home drag-and-drop is active only in Custom mode.
 
+## v0.04-alpha — Build #5
+
+- Split the built-in YouTube choice into **YouTube (Desktop)** (`https://www.youtube.com/`) and **YouTube (Smart TV Experience)** (`https://www.youtube.com/tv`), with separate stable definitions and the appropriate default Experience.
+- Updated Choose / Manage Services with an accessible On/Off switch, alphabetical built-in results, and cleaner service status presentation.
+- Fixed the service-view overflow menu so Restart Service and Reset Site Data reliably open from the three-dot control.
+- Strengthened Home-card hover and keyboard-focus feedback with a restrained accent border and shadow treatment, including Reduced Motion support.
+- Reworked Current Location selection into Direct/Last used/country/city flow using only the documented Nord SOCKS5 endpoint catalog. Location changes now cancel stale gateway connections so Nord → Direct → Nord reconnects cleanly.
+- Fixed Home Square artwork sizing and preserved each service's Fill/Fit behavior. Login redirects that report WebView2 `Unknown` during known provider auth flows no longer show a false error screen.
+
+Known alpha limitations: Current Location remains browser-proxy routing, not a full-device VPN or an absolute WebRTC/UDP leak-proof boundary. A provider's catalog availability may depend on account, licensing, cookies, or other signals in addition to network location. Real Nord credentials, endpoint availability, streaming playback, and provider login flows require hands-on testing.
+
+## v0.04-alpha — Build #4
+
+- Fixed a first-run/runtime crash in Choose / Manage Services caused by the region filter firing before its service collection was initialized.
+
+## v0.04-alpha — Build #3
+
+- Fixed the splash screen so it closes before the alpha warning, first-run setup, and other startup dialogs can appear.
+
+## v0.04-alpha — Build #2
+
+- Added the polished Home launcher, local default/manage-services library, service-view navigation controls and error details, Settings organization, Storage and Recovery hardening, and the Home Escape behavior completed during the unreleased v0.04 development cycle.
+
 ## v0.04-alpha — Build #1
 
 - Added optional **Current Location** setup: users can configure NordVPN service credentials during first-run setup or skip the feature entirely.
