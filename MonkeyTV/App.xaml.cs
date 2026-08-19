@@ -41,6 +41,12 @@ public partial class App : Application
         SplashWindow? splash = null;
         try
         {
+            void CloseSplash()
+            {
+                if (splash is null) return;
+                splash.Close();
+                splash = null;
+            }
             splash = new SplashWindow();
             splash.Show();
             Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
@@ -55,6 +61,7 @@ public partial class App : Application
 
             if (store.LastLoadOutcome == SettingsLoadOutcome.Unrecoverable)
             {
+                CloseSplash();
                 var recovery = new RecoveryWindow(RecoveryMode.ConfigurationFailure);
                 if (recovery.ShowDialog() != true) { Shutdown(); return; }
                 if (recovery.Choice == RecoveryChoice.Restore)
@@ -66,9 +73,13 @@ public partial class App : Application
                 else { Shutdown(); return; }
             }
             else if (store.LastLoadOutcome == SettingsLoadOutcome.Recovered)
+            {
+                CloseSplash();
                 new RecoveryWindow(RecoveryMode.RecoveredConfiguration, store.LastRecoveryFile).ShowDialog();
+            }
             else if (startupState.ConsecutiveFailures >= 3)
             {
+                CloseSplash();
                 var recovery = new RecoveryWindow(RecoveryMode.RepeatedStartup);
                 recovery.ShowDialog();
                 if (recovery.Choice == RecoveryChoice.Restore && ConfigurationRecoveryService.TryRestoreLatest(out var restored, out _)) { settings = restored; store.Save(settings); }
@@ -82,6 +93,7 @@ public partial class App : Application
 
             if (!string.Equals(settings.DismissedAlphaVersion, AlphaWarningKey, StringComparison.OrdinalIgnoreCase))
             {
+                CloseSplash();
                 var warning = new AlphaWarningWindow(DisplayVersion) { Topmost = true };
                 if (warning.ShowDialog() != true) { Shutdown(); return; }
                 if (warning.DontShowAgain)
@@ -93,24 +105,24 @@ public partial class App : Application
 
             if (!settings.SetupComplete)
             {
+                CloseSplash();
                 var setup = new SetupWindow(settings, store);
                 if (setup.ShowDialog() != true) { Shutdown(); return; }
                 settings = store.Load();
             }
 
             if (startupState.Unclean && startupState.ConsecutiveFailures < 3 && settings.SetupComplete)
+            {
+                CloseSplash();
                 new RecoveryWindow().ShowDialog();
+            }
 
             var main = new MainWindow(settings, store);
             MainWindow = main;
             WindowPlacementService.Restore(main, settings);
             main.ContentRendered += (_, _) =>
             {
-                if (splash is not null)
-                {
-                    splash.Close();
-                    splash = null;
-                }
+                CloseSplash();
                 startup.Stop();
                 LastStartupMilliseconds = startup.ElapsedMilliseconds;
                 SessionMarker.MarkStartupSuccessful();

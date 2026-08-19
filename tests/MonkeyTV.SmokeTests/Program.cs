@@ -9,8 +9,8 @@ static void Require(bool condition, string message)
 
 PortablePaths.EnsureCreated();
 Require(App.DisplayVersion == "0.04-alpha", "Release version metadata is incorrect.");
-Require(App.BuildNumber == "2", "Build #2 metadata is incorrect.");
-Require(App.AlphaWarningKey == "0.04-alpha-build-2", "Alpha warning is not keyed to v0.04 Build #2.");
+Require(App.BuildNumber == "3", "Build #3 metadata is incorrect.");
+Require(App.AlphaWarningKey == "0.04-alpha-build-3", "Alpha warning is not keyed to v0.04 Build #3.");
 Require(NordLocationCatalog.All.Count >= 3, "Nord location catalog is missing documented presets.");
 Require(NordLocationCatalog.Get(NordLocationId.UnitedStates).Host == "us.socks.nordhold.net", "Documented Nord US SOCKS host changed unexpectedly.");
 var locationSettings = new MonkeySettings { LastUsedNordLocation = NordLocationId.NewYork };
