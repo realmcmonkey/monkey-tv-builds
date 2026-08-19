@@ -51,6 +51,10 @@ public partial class MainWindow : Window
     private ulong? _launchNavigationId;
     private long _homeSuspensionGeneration;
     private bool _cacheBudgetCheckRunning;
+    private Point _dragStart;
+    private Button? _dragSource;
+    private Button? _dragOverCard;
+    private double _lastHomeLayoutWidth;
     private static readonly TimeSpan ServiceLaunchTimeout = TimeSpan.FromSeconds(45);
 
     public MainWindow(MonkeySettings settings, SettingsStore store)
@@ -93,42 +97,32 @@ public partial class MainWindow : Window
     {
         ClockText.Visibility = _settings.ShowClock ? Visibility.Visible : Visibility.Collapsed;
         CurrentLocationButton.Visibility = _settings.CurrentLocationEnabled ? Visibility.Visible : Visibility.Collapsed;
-        var filter = SearchBox.Text?.Trim() ?? "";
-        var services = _settings.Services.Where(s => s.Name.Contains(filter, StringComparison.CurrentCultureIgnoreCase)).ToList();
+        var services = _settings.Services;
         ServicesPanel.Children.Clear();
         foreach (var service in services)
             ServicesPanel.Children.Add(CreateTile(service));
 
-        ServicesSummaryText.Text = string.IsNullOrWhiteSpace(filter)
-            ? _settings.Services.Count switch { 0 => "Ready when you are", 1 => "1 configured service", _ => $"{_settings.Services.Count} configured services" }
-            : services.Count switch { 0 => $"No services match “{filter}”", 1 => "1 matching service", _ => $"{services.Count} matching services" };
+        ServicesSummaryText.Text = _settings.Services.Count switch { 0 => "Ready when you are", 1 => "1 configured service", _ => $"{_settings.Services.Count} configured services" };
 
         EmptyState.Visibility = services.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        AddManageServicesButton.Visibility = services.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
         if (_settings.Services.Count == 0)
         {
-            EmptyTitle.Text = "Your services will appear here";
-            EmptyDescription.Text = "Add a streaming website to create your first launcher card. Nothing is loaded until you click it.";
+            EmptyTitle.Text = "Welcome to Monkey TV";
+            EmptyDescription.Text = "Choose the streaming services you use to get started.";
             EmptyAddButton.Visibility = Visibility.Visible;
-        }
-        else if (services.Count == 0)
-        {
-            EmptyTitle.Text = "No matching services";
-            EmptyDescription.Text = "Search only checks the names of services you have configured.";
-            EmptyAddButton.Visibility = Visibility.Collapsed;
         }
     }
 
     private Button CreateTile(ServiceDefinition service)
     {
-        var banner = _settings.CardStyle == ServiceCardStyle.Banner;
-        var (width, height) = banner
-            ? _settings.TileSize switch { TileSize.Small => (210d, 118d), TileSize.Large => (336d, 189d), _ => (270d, 152d) }
-            : _settings.TileSize switch { TileSize.Small => (128d, 128d), TileSize.Large => (220d, 220d), _ => (170d, 170d) };
+        var (width, height) = GetHomeCardSize();
+        const bool banner = true;
 
         var button = new Button
         {
             Width = width,
-            Margin = new Thickness(0, 0, banner ? 20 : 18, 24),
+            Margin = new Thickness(0, 0, 20, 28),
             Tag = service,
             Style = (Style)FindResource("ServiceCardButtonStyle"),
             RenderTransformOrigin = new Point(.5, .5),
@@ -171,11 +165,24 @@ public partial class MainWindow : Window
         }
 
         button.Content = content;
-        button.MouseEnter += (_, _) => AnimateCard(scale, lift, shadow, 1.025, -3, 25, .48);
+        button.MouseEnter += (_, _) => AnimateCard(scale, lift, shadow, 1.02, -3, 24, .44);
         button.MouseLeave += (_, _) => AnimateCard(scale, lift, shadow, 1, 0, 18, .32);
+        button.PreviewMouseLeftButtonDown += ServiceCard_MouseLeftButtonDown;
+        button.PreviewMouseMove += ServiceCard_MouseMove;
         button.Click += async (_, _) => await OpenServiceAsync(service);
         button.ContextMenu = CreateServiceContextMenu(service);
         return button;
+    }
+
+    private (double Width, double Height) GetHomeCardSize()
+    {
+        var available = HomeScroll.ViewportWidth > 0 ? HomeScroll.ViewportWidth - 80 : ActualWidth - 80;
+        available = Math.Max(520, available);
+        var columns = available >= 1040 ? 4 : available >= 760 ? 3 : 2;
+        var width = (available - 20 * (columns - 1)) / columns;
+        var (minimum, maximum) = _settings.TileSize switch { TileSize.Small => (180d, 240d), TileSize.Large => (250d, 350d), _ => (220d, 310d) };
+        width = Math.Clamp(width, minimum, maximum);
+        return (Math.Floor(width), Math.Floor(width * 9 / 16));
     }
 
     private Grid CreateCardArtwork(ServiceDefinition service, double width, double height, bool banner)
@@ -189,12 +196,6 @@ public partial class MainWindow : Window
                 RadiusX = 16,
                 RadiusY = 16,
                 Fill = new ImageBrush(artwork) { Stretch = service.BannerFit == BannerFit.Fit ? Stretch.Uniform : Stretch.UniformToFill, AlignmentX = AlignmentX.Center, AlignmentY = AlignmentY.Center }
-            });
-            grid.Children.Add(new System.Windows.Shapes.Rectangle
-            {
-                RadiusX = 16,
-                RadiusY = 16,
-                Fill = new LinearGradientBrush(Color.FromArgb(0, 0, 0, 0), Color.FromArgb(68, 0, 0, 0), new Point(.5, 0), new Point(.5, 1))
             });
             return grid;
         }
@@ -322,6 +323,70 @@ public partial class MainWindow : Window
         lift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(targetY, duration) { EasingFunction = easing });
         shadow.BeginAnimation(DropShadowEffect.BlurRadiusProperty, new DoubleAnimation(blur, duration) { EasingFunction = easing });
         shadow.BeginAnimation(DropShadowEffect.OpacityProperty, new DoubleAnimation(opacity, duration) { EasingFunction = easing });
+    }
+
+    private void HomeScroll_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (Math.Abs(e.NewSize.Width - _lastHomeLayoutWidth) < 8) return;
+        _lastHomeLayoutWidth = e.NewSize.Width;
+        if (IsLoaded) RenderHome();
+    }
+
+    private void ServiceCard_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is Button button) { _dragSource = button; _dragStart = e.GetPosition(this); }
+    }
+
+    private void ServiceCard_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (_dragSource is not { Tag: ServiceDefinition } source || e.LeftButton != MouseButtonState.Pressed) return;
+        var point = e.GetPosition(this);
+        if (Math.Abs(point.X - _dragStart.X) < 8 && Math.Abs(point.Y - _dragStart.Y) < 8) return;
+        _dragSource.Opacity = .55;
+        try { DragDrop.DoDragDrop(_dragSource, new DataObject(typeof(ServiceDefinition), source), DragDropEffects.Move); }
+        finally { if (_dragSource is not null) _dragSource.Opacity = 1; _dragSource = null; }
+    }
+
+    private void ServicesPanel_DragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = e.Data.GetDataPresent(typeof(ServiceDefinition)) ? DragDropEffects.Move : DragDropEffects.None;
+        SetDropTarget(FindParent<Button>(e.OriginalSource as DependencyObject));
+        e.Handled = true;
+    }
+
+    private void ServicesPanel_DragLeave(object sender, DragEventArgs e) { SetDropTarget(null); e.Handled = true; }
+
+    private void ServicesPanel_Drop(object sender, DragEventArgs e)
+    {
+        SetDropTarget(null);
+        if (!e.Data.GetDataPresent(typeof(ServiceDefinition)) || e.Data.GetData(typeof(ServiceDefinition)) is not ServiceDefinition source) return;
+        var target = FindParent<Button>(e.OriginalSource as DependencyObject);
+        if (target?.Tag is ServiceDefinition destination && ReferenceEquals(source, destination)) return;
+        var from = _settings.Services.IndexOf(source); var to = target?.Tag is ServiceDefinition targetService ? _settings.Services.IndexOf(targetService) : _settings.Services.Count;
+        if (from < 0 || to < 0) return;
+        if (target is not null && e.GetPosition(target).X > target.ActualWidth / 2) to++;
+        _settings.Services.RemoveAt(from); if (from < to) to--; _settings.Services.Insert(Math.Clamp(to, 0, _settings.Services.Count), source);
+        _store.Save(_settings); RenderHome(); e.Handled = true;
+    }
+
+    private void SetDropTarget(Button? button)
+    {
+        if (ReferenceEquals(_dragOverCard, button)) return;
+        SetCardBorder(_dragOverCard, new SolidColorBrush(Color.FromArgb(32, 255, 255, 255)), 1);
+        _dragOverCard = button;
+        SetCardBorder(_dragOverCard, (Brush)FindResource("AccentBrush"), 2);
+    }
+
+    private static void SetCardBorder(Button? button, Brush brush, double thickness)
+    {
+        if (button?.Content is StackPanel { Children: { Count: > 0 } } stack && stack.Children[0] is Border card)
+        { card.BorderBrush = brush; card.BorderThickness = new Thickness(thickness); }
+    }
+
+    private static T? FindParent<T>(DependencyObject? element) where T : DependencyObject
+    {
+        while (element is not null) { if (element is T match) return match; element = VisualTreeHelper.GetParent(element); }
+        return null;
     }
 
     private static TextBlock Initial(string name, double fontSize = 26) => new() { Text = string.IsNullOrWhiteSpace(name) ? "?" : name[..1].ToUpperInvariant(), FontSize = fontSize, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
@@ -901,23 +966,13 @@ public partial class MainWindow : Window
         catch { }
     }
 
-    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e) { if (IsLoaded) RenderHome(); }
-    private void SearchToggle_Click(object sender, RoutedEventArgs e)
-    {
-        SearchContainer.Visibility = Visibility.Visible;
-        HeaderAddServiceButton.Visibility = Visibility.Collapsed;
-        SearchBox.Focus(); SearchBox.SelectAll();
-    }
-    private void CloseSearch_Click(object sender, RoutedEventArgs e)
-    {
-        SearchBox.Clear(); SearchContainer.Visibility = Visibility.Collapsed; HeaderAddServiceButton.Visibility = Visibility.Visible;
-    }
     private void AddService_Click(object sender, RoutedEventArgs e)
     {
         var editor = new ServiceEditorWindow { Owner = this };
         if (editor.ShowDialog() != true) return;
         _settings.Services.Add(editor.Result); _store.Save(_settings); RenderHome();
     }
+    private void AddManageServices_Click(object sender, RoutedEventArgs e) => Settings_Click(sender, e);
 
     private void UpdateCurrentLocationControl()
     {
@@ -1025,12 +1080,17 @@ public partial class MainWindow : Window
     {
         if (HandleApplicationShortcut(e)) return;
         if (e.Key == Key.F11) { ToggleApplicationFullscreen(); e.Handled = true; }
+        // Home is a temporary suspension state when a service exists. Escape resumes that exact
+        // service rather than treating Home as an application-fullscreen exit.
+        else if (e.Key == Key.Escape && HomeView.Visibility == Visibility.Visible &&
+                 _activeServiceId is { } id && _webView is not null &&
+                 _settings.Services.FirstOrDefault(service => service.Id == id) is { } suspendedService)
+        { e.Handled = true; _ = OpenServiceAsync(suspendedService); }
         // A visible service owns Escape. Do not use application fullscreen as a reason to
         // consume it: TV/web players need the same Escape behavior as in a normal window.
         else if (e.Key == Key.Escape && _webView is not null && BrowserView.Visibility == Visibility.Visible) { return; }
         else if (e.Key == Key.Escape && _websiteFullscreen) { return; }
         else if (e.Key == Key.Escape && _appFullscreen) { SetApplicationFullscreen(false); e.Handled = true; }
-        else if (e.Key == Key.Escape && SearchContainer.Visibility == Visibility.Visible) { CloseSearch_Click(this, e); e.Handled = true; }
     }
 
     private void Window_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
