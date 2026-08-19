@@ -22,6 +22,7 @@ public partial class SettingsWindow : Window
         CardStyleBox.SelectedIndex = (int)_settings.CardStyle; TileSizeBox.SelectedIndex = (int)_settings.TileSize;
         ThemeBox.SelectedIndex = (int)_settings.Theme; AccentBox.SelectedIndex = (int)_settings.Accent;
         ShowNamesCheck.IsChecked = _settings.ShowServiceNames; ShowClockCheck.IsChecked = _settings.ShowClock;
+        ServiceSortingBox.SelectedIndex = (int)_settings.ServiceSorting;
         AboutVersionText.Text = $"Version v{App.DisplayVersion} — Build #{App.BuildNumber}";
         NordStatusText.Text = NordCredentialStore.HasCredentials ? "NordVPN service credentials are saved securely." : "No NordVPN service credentials are saved.";
         ShowCurrentLocationCheck.IsChecked = _settings.CurrentLocationEnabled;
@@ -31,7 +32,7 @@ public partial class SettingsWindow : Window
 
     private void ShowPage(FrameworkElement page)
     {
-        foreach (var candidate in new FrameworkElement[] { ServicesPage, AppearancePage, VpnPage, StoragePage, BackupPage, AboutPage }) candidate.Visibility = Visibility.Collapsed;
+        foreach (var candidate in new FrameworkElement[] { ServicesPage, HomePage, AppearancePage, VpnPage, StoragePage, BackupPage, AboutPage }) candidate.Visibility = Visibility.Collapsed;
         page.Visibility = Visibility.Visible;
         if (ReferenceEquals(page, StoragePage)) RefreshStorage();
         if (ReferenceEquals(page, AboutPage)) RefreshAbout();
@@ -40,7 +41,7 @@ public partial class SettingsWindow : Window
     private void Nav_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string tag }) return;
-        ShowPage(tag switch { "Appearance" => AppearancePage, "VPN" => VpnPage, "Storage" => StoragePage, "Backup" => BackupPage, "About" => AboutPage, _ => ServicesPage });
+        ShowPage(tag switch { "Home" => HomePage, "Appearance" => AppearancePage, "VPN" => VpnPage, "Storage" => StoragePage, "Backup" => BackupPage, "About" => AboutPage, _ => ServicesPage });
     }
 
     private void RefreshList(int selected = -1)
@@ -102,6 +103,12 @@ public partial class SettingsWindow : Window
         ThemeService.Apply(_settings);
         _appearanceSaved = true;
         Close();
+    }
+
+    private void SaveHome_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.ServiceSorting = (ServiceSorting)Math.Max(0, ServiceSortingBox.SelectedIndex);
+        _store.Save(_settings); Close();
     }
 
     private void AppearancePreview_Changed(object sender, SelectionChangedEventArgs e)

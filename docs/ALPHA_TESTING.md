@@ -22,6 +22,10 @@ Test with a copy of the package and non-critical accounts. Back up `Data` before
 
 ## Services and portability
 
+- [ ] Choose / Manage Services lists only services with bundled artwork; enabling several services adds them without contacting providers.
+- [ ] Built-in service toggles save together, disabled built-ins require removal confirmation without clearing browser data, and customized built-ins can Restore Defaults.
+- [ ] Settings → Home Custom sorting preserves Home drag order. A–Z, Z–A, and Added modes disable dragging without losing the underlying Custom order.
+
 - [ ] Confirm the supplied Monkey TV logo appears in the executable/window, Home header, alpha warning, and startup splash.
 - [ ] Confirm the splash remains visible for at least three seconds and does not initialize WebView2.
 - [ ] Open Add/Edit Service → Change banner and confirm all 46 built-in banners appear under Canada, General, United Kingdom, United States, and Web.

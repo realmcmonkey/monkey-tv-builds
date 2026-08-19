@@ -39,6 +39,11 @@ public sealed class SettingsStore
         }
         foreach (var service in settings.Services)
         {
+            if (service.AddedUtc == default)
+            {
+                service.AddedUtc = DateTime.UtcNow;
+                changed = true;
+            }
             if (service.FutureSettings is null)
             {
                 service.FutureSettings = new Dictionary<string, string>();

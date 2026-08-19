@@ -43,6 +43,7 @@ public partial class ServiceEditorWindow : Window
         Id = s.Id, Name = s.Name, Url = s.Url, IconPath = s.IconPath, BannerPath = s.BannerPath, BannerFit = s.BannerFit,
         Experience = s.Experience, CustomUserAgentOverride = s.CustomUserAgentOverride,
         ProfileConfiguration = s.ProfileConfiguration, BrowserStorageMode = s.BrowserStorageMode,
+        BuiltInServiceId = s.BuiltInServiceId, BuiltInDefinitionRevision = s.BuiltInDefinitionRevision, AddedUtc = s.AddedUtc,
         FutureSettings = new Dictionary<string, string>(s.FutureSettings)
     };
 

@@ -21,8 +21,8 @@ public partial class SetupWindow : Window
 
     private void AddService_Click(object sender, RoutedEventArgs e)
     {
-        var editor = new ServiceEditorWindow { Owner = this };
-        if (editor.ShowDialog() == true) { _settings.Services.Add(editor.Result); _store.Save(_settings); RefreshServices(); }
+        var manager = new ManageServicesWindow(_settings, _store) { Owner = this };
+        if (manager.ShowDialog() == true) RefreshServices();
     }
 
     private void ServicesDone_Click(object sender, RoutedEventArgs e)

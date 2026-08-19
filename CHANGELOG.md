@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased development
+
+- Added one local-only Choose / Manage Services library built from the bundled service artwork. It offers only providers with included artwork, supports bulk enable/disable, custom-service addition, conservative duplicate warnings, and Restore Defaults for customized built-in copies.
+- Added Settings → Home service sorting. Automatic sort modes preserve the stored Custom drag order; Home drag-and-drop is active only in Custom mode.
+
 ## v0.04-alpha — Build #1
 
 - Added optional **Current Location** setup: users can configure NordVPN service credentials during first-run setup or skip the feature entirely.

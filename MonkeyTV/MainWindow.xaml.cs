@@ -97,8 +97,9 @@ public partial class MainWindow : Window
     {
         ClockText.Visibility = _settings.ShowClock ? Visibility.Visible : Visibility.Collapsed;
         CurrentLocationButton.Visibility = _settings.CurrentLocationEnabled ? Visibility.Visible : Visibility.Collapsed;
-        var services = _settings.Services;
+        var services = GetHomeServices();
         ServicesPanel.Children.Clear();
+        ServicesPanel.AllowDrop = _settings.ServiceSorting == ServiceSorting.Custom;
         foreach (var service in services)
             ServicesPanel.Children.Add(CreateTile(service));
 
@@ -113,6 +114,15 @@ public partial class MainWindow : Window
             EmptyAddButton.Visibility = Visibility.Visible;
         }
     }
+
+    private IReadOnlyList<ServiceDefinition> GetHomeServices() => _settings.ServiceSorting switch
+    {
+        ServiceSorting.AlphabeticalAscending => _settings.Services.OrderBy(service => service.Name, StringComparer.CurrentCultureIgnoreCase).ToList(),
+        ServiceSorting.AlphabeticalDescending => _settings.Services.OrderByDescending(service => service.Name, StringComparer.CurrentCultureIgnoreCase).ToList(),
+        ServiceSorting.RecentlyAddedNewest => _settings.Services.OrderByDescending(service => service.AddedUtc).ToList(),
+        ServiceSorting.RecentlyAddedOldest => _settings.Services.OrderBy(service => service.AddedUtc).ToList(),
+        _ => _settings.Services
+    };
 
     private Button CreateTile(ServiceDefinition service)
     {
@@ -167,8 +177,11 @@ public partial class MainWindow : Window
         button.Content = content;
         button.MouseEnter += (_, _) => AnimateCard(scale, lift, shadow, 1.02, -3, 24, .44);
         button.MouseLeave += (_, _) => AnimateCard(scale, lift, shadow, 1, 0, 18, .32);
-        button.PreviewMouseLeftButtonDown += ServiceCard_MouseLeftButtonDown;
-        button.PreviewMouseMove += ServiceCard_MouseMove;
+        if (_settings.ServiceSorting == ServiceSorting.Custom)
+        {
+            button.PreviewMouseLeftButtonDown += ServiceCard_MouseLeftButtonDown;
+            button.PreviewMouseMove += ServiceCard_MouseMove;
+        }
         button.Click += async (_, _) => await OpenServiceAsync(service);
         button.ContextMenu = CreateServiceContextMenu(service);
         return button;
@@ -349,6 +362,7 @@ public partial class MainWindow : Window
 
     private void ServicesPanel_DragOver(object sender, DragEventArgs e)
     {
+        if (_settings.ServiceSorting != ServiceSorting.Custom) { e.Effects = DragDropEffects.None; e.Handled = true; return; }
         e.Effects = e.Data.GetDataPresent(typeof(ServiceDefinition)) ? DragDropEffects.Move : DragDropEffects.None;
         SetDropTarget(FindParent<Button>(e.OriginalSource as DependencyObject));
         e.Handled = true;
@@ -358,6 +372,7 @@ public partial class MainWindow : Window
 
     private void ServicesPanel_Drop(object sender, DragEventArgs e)
     {
+        if (_settings.ServiceSorting != ServiceSorting.Custom) return;
         SetDropTarget(null);
         if (!e.Data.GetDataPresent(typeof(ServiceDefinition)) || e.Data.GetData(typeof(ServiceDefinition)) is not ServiceDefinition source) return;
         var target = FindParent<Button>(e.OriginalSource as DependencyObject);
@@ -972,7 +987,11 @@ public partial class MainWindow : Window
         if (editor.ShowDialog() != true) return;
         _settings.Services.Add(editor.Result); _store.Save(_settings); RenderHome();
     }
-    private void AddManageServices_Click(object sender, RoutedEventArgs e) => Settings_Click(sender, e);
+    private void AddManageServices_Click(object sender, RoutedEventArgs e)
+    {
+        var manager = new ManageServicesWindow(_settings, _store) { Owner = this };
+        if (manager.ShowDialog() == true) { _settings = _store.Load(); RenderHome(); }
+    }
 
     private void UpdateCurrentLocationControl()
     {

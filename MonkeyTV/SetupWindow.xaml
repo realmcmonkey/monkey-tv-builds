@@ -23,7 +23,7 @@
         </StackPanel>
         <ListBox x:Name="SetupServicesList" Grid.Row="1" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource TextBrush}" FontSize="15"/>
         <Grid Grid.Row="2">
-          <Button Content="Add service" Click="AddService_Click" HorizontalAlignment="Left"/>
+          <Button Content="Choose services" Click="AddService_Click" HorizontalAlignment="Left"/>
           <Button Style="{StaticResource AccentButton}" Content="Done" Click="ServicesDone_Click" HorizontalAlignment="Right" MinWidth="105"/>
         </Grid>
       </Grid>

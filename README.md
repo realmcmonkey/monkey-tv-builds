@@ -29,6 +29,7 @@ The Microsoft Edge WebView2 Evergreen Runtime must be installed. It is normally 
 - On-demand WebView2 creation; no service preloading
 - One reusable WebView2 and one shared portable browser profile for every configured service
 - Optional browser-only Current Location selector: Direct at every startup, or user-selected documented NordVPN SOCKS5 presets using protected Nord service credentials (not a device-wide VPN)
+- Local Choose / Manage Services library using bundled artwork only, plus optional Home sorting and Custom drag ordering
 - Same-service Home resume; different services reuse the same WebView and navigate it to the new destination
 - Local-artwork launch transition hides the previous website until a different service finishes its initial navigation
 - Friendly navigation/process-failure screens with Retry and Home

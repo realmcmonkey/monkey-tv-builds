@@ -5,6 +5,7 @@
     <Border Background="{DynamicResource SurfaceBrush}" Padding="24"><StackPanel>
       <TextBlock Text="Settings" FontSize="24" FontWeight="SemiBold" Margin="4,4,0,30"/>
       <Button Content="Services" Tag="Services" HorizontalContentAlignment="Left" Click="Nav_Click" Margin="0,0,0,7"/>
+      <Button Content="Home" Tag="Home" HorizontalContentAlignment="Left" Click="Nav_Click" Margin="0,0,0,7"/>
       <Button Content="Appearance" Tag="Appearance" HorizontalContentAlignment="Left" Click="Nav_Click" Margin="0,0,0,7"/>
       <Button Content="Current Location" Tag="VPN" HorizontalContentAlignment="Left" Click="Nav_Click" Margin="0,0,0,7"/>
       <Button Content="Storage" Tag="Storage" HorizontalContentAlignment="Left" Click="Nav_Click" Margin="0,0,0,7"/>
@@ -30,6 +31,11 @@
         <TextBlock Text="Card size" Margin="0,0,0,8"/><ComboBox x:Name="TileSizeBox" Width="220" HorizontalAlignment="Left" Margin="0,0,0,28"><ComboBoxItem Content="Small"/><ComboBoxItem Content="Medium"/><ComboBoxItem Content="Large"/></ComboBox>
         <CheckBox x:Name="ShowNamesCheck" Content="Show service names" Margin="0,0,0,20"/><CheckBox x:Name="ShowClockCheck" Content="Show clock on Home"/>
       </StackPanel></ScrollViewer><Button Grid.Row="1" Style="{StaticResource AccentButton}" Content="Save appearance" HorizontalAlignment="Right" Click="SaveAppearance_Click" Margin="0,16,0,0"/></Grid>
+      <Grid x:Name="HomePage" Visibility="Collapsed"><Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><StackPanel>
+        <TextBlock Text="Home" FontSize="28" FontWeight="SemiBold"/><TextBlock Text="Choose how services appear on Home." Foreground="{DynamicResource MutedBrush}" Margin="0,7,0,28"/>
+        <TextBlock Text="Service sorting" Margin="0,0,0,8"/><ComboBox x:Name="ServiceSortingBox" Width="280" HorizontalAlignment="Left"><ComboBoxItem Content="Custom"/><ComboBoxItem Content="Alphabetical — A to Z"/><ComboBoxItem Content="Alphabetical — Z to A"/><ComboBoxItem Content="Recently Added — Newest First"/><ComboBoxItem Content="Recently Added — Oldest First"/></ComboBox>
+        <TextBlock Text="Custom enables drag-and-drop Home ordering. Automatic modes preserve your Custom order in the background for later." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,10,0,0" MaxWidth="520"/>
+      </StackPanel><Button Grid.Row="1" Style="{StaticResource AccentButton}" Content="Save Home settings" HorizontalAlignment="Right" Click="SaveHome_Click" Margin="0,16,0,0"/></Grid>
       <ScrollViewer x:Name="VpnPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto"><StackPanel>
         <TextBlock Text="Current Location" FontSize="28" FontWeight="SemiBold"/>
         <TextBlock Text="NordVPN is optional. Monkey TV uses Nord's documented SOCKS5 locations only; your normal Nord account password is not used here." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" LineHeight="20" Margin="0,7,0,24"/>

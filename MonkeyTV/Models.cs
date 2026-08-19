@@ -10,6 +10,7 @@ public enum BannerFit { Fill, Fit }
 public enum BrowserStorageMode { LegacyIsolated, SharedProfile, UnifiedSharedProfile }
 public enum AppTheme { System, Light, Dark }
 public enum AppAccent { System, Blue, Purple, Green, Orange, Red }
+public enum ServiceSorting { Custom, AlphabeticalAscending, AlphabeticalDescending, RecentlyAddedNewest, RecentlyAddedOldest }
 public enum CurrentLocationState { Direct, Connecting, Connected, Failed }
 public enum NordLocationId { UnitedStates, Netherlands, Sweden, Atlanta, Chicago, Dallas, LosAngeles, NewYork, Phoenix, SanFrancisco, Stockholm, Amsterdam }
 
@@ -26,6 +27,9 @@ public sealed class ServiceDefinition
     public ServiceExperience Experience { get; set; } = ServiceExperience.Default;
     public string? CustomUserAgentOverride { get; set; }
     public string ProfileConfiguration { get; set; } = "Persistent";
+    public string? BuiltInServiceId { get; set; }
+    public int BuiltInDefinitionRevision { get; set; }
+    public DateTime AddedUtc { get; set; } = DateTime.UtcNow;
     // Build #2 uses one shared browser profile. Earlier modes remain only to preserve
     // configuration and on-disk data during migration; they are no longer selected for launch.
     [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -58,6 +62,8 @@ public sealed class MonkeySettings
     public double? WindowWidth { get; set; }
     public double? WindowHeight { get; set; }
     public bool WindowMaximized { get; set; }
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public ServiceSorting ServiceSorting { get; set; } = ServiceSorting.Custom;
     public bool CurrentLocationEnabled { get; set; }
     // This is a convenience only. Startup always begins on Direct and never reconnects it.
     [JsonConverter(typeof(JsonStringEnumConverter))]

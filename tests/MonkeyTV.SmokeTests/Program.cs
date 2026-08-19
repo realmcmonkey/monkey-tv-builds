@@ -26,6 +26,14 @@ await using (var directRouter = new CurrentLocationRouter())
     Require(directRouter.State == CurrentLocationState.Direct, "Direct selection did not restore Direct state.");
 }
 Require(BuiltInArtworkCatalog.All.Count == 46, "The built-in artwork catalog is incomplete.");
+Require(BuiltInServiceCatalog.All.Count == BuiltInArtworkCatalog.All.Count, "Manage Services does not match the bundled artwork library.");
+Require(BuiltInServiceCatalog.All.All(service => BuiltInArtworkCatalog.TryGet(service.ArtworkReference) is not null), "A built-in service has no bundled artwork.");
+var builtInYouTubeTv = BuiltInServiceCatalog.Find("general/youtube-tv") ?? throw new InvalidOperationException("YouTube TV built-in definition is missing.");
+var builtInCopy = builtInYouTubeTv.Create();
+Require(builtInCopy.BuiltInServiceId == builtInYouTubeTv.Id && builtInCopy.BannerPath == builtInYouTubeTv.ArtworkReference, "Built-in service template was not applied.");
+Require(!BuiltInServiceCatalog.IsCustomized(builtInCopy, builtInYouTubeTv), "Fresh built-in service was incorrectly marked customized.");
+builtInCopy.Name = "My TV"; Require(BuiltInServiceCatalog.IsCustomized(builtInCopy, builtInYouTubeTv), "Customized built-in service was not recognized.");
+BuiltInServiceCatalog.RestoreDefaults(builtInCopy, builtInYouTubeTv); Require(!BuiltInServiceCatalog.IsCustomized(builtInCopy, builtInYouTubeTv), "Restore Defaults did not restore template properties.");
 Require(BuiltInArtworkCatalog.All.Select(item => item.Reference).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 46, "Built-in artwork references are not unique.");
 Require(BuiltInArtworkCatalog.FindBestMatch("Disney+", "https://www.disneyplus.com/")?.Name == "Disney+", "Disney+ default artwork matching failed.");
 Require(BuiltInArtworkCatalog.FindBestMatch("YouTube TV", "https://tv.youtube.com/")?.Name == "YouTube TV", "YouTube TV default artwork matching failed.");
