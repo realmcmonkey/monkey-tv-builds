@@ -51,6 +51,9 @@ public partial class MainWindow : Window
     private ulong? _launchNavigationId;
     private long _homeSuspensionGeneration;
     private bool _cacheBudgetCheckRunning;
+    private bool _serviceNavigationLoading;
+    private string? _lastNavigationUrl;
+    private string? _lastErrorDiagnostic;
     private Point _dragStart;
     private Button? _dragSource;
     private Button? _dragOverCard;
@@ -65,7 +68,10 @@ public partial class MainWindow : Window
         _clockTimer.Start();
         _serviceControls = new ServiceControlsWindow();
         _serviceControls.BackRequested += (_, _) => BrowserBack_Click(this, new RoutedEventArgs());
+        _serviceControls.ForwardRequested += (_, _) => BrowserForward_Click(this, new RoutedEventArgs());
         _serviceControls.ReloadRequested += (_, _) => BrowserReload_Click(this, new RoutedEventArgs());
+        _serviceControls.RestartRequested += (_, _) => RestartActiveService();
+        _serviceControls.ResetSiteDataRequested += (_, _) => _ = ResetActiveServiceSiteDataAsync();
         // Defer Home until the owned overlay's click route has completed. Hiding an owned
         // no-activate window synchronously inside its own Button.Click can cancel the pointer
         // route before WPF reliably transfers control back to the owner window.
@@ -554,9 +560,13 @@ public partial class MainWindow : Window
                     ExternalNavigationPolicy.OpenInDefaultBrowser(target.AbsoluteUri);
                     return;
                 }
+                _lastNavigationUrl = SafeDiagnosticUrl(e.Uri);
+                _serviceNavigationLoading = true;
+                UpdateNavigationControls(view);
                 if (_launchTransitionActive && _launchServiceId == _activeServiceId)
                     _launchNavigationId = e.NavigationId;
             });
+            view.CoreWebView2.HistoryChanged += (_, _) => Dispatcher.Invoke(() => UpdateNavigationControls(view));
             view.CoreWebView2.ContainsFullScreenElementChanged += (_, _) => Dispatcher.Invoke(() =>
             {
                 if (generation == _browserGeneration && ReferenceEquals(_webView, view))
@@ -565,6 +575,8 @@ public partial class MainWindow : Window
             view.NavigationCompleted += (_, e) =>
             {
                 if (generation != _browserGeneration || !ReferenceEquals(_webView, view)) return;
+                _serviceNavigationLoading = false;
+                Dispatcher.Invoke(() => UpdateNavigationControls(view));
                 if (_launchTransitionActive)
                 {
                     // A new service navigation cancels the previous top-level navigation. Ignore
@@ -572,12 +584,13 @@ public partial class MainWindow : Window
                     if (_launchServiceId != _activeServiceId || _launchNavigationId != e.NavigationId) return;
                     if (e.IsSuccess) CompleteServiceLaunch(view);
                     else if (ActiveService is { } launchingService)
-                        ShowServiceError(launchingService, "Something went wrong while connecting to this service.", "WebView2 navigation status: " + e.WebErrorStatus);
+                        ShowNavigationError(launchingService, e.WebErrorStatus, "WebView2 NavigationCompleted");
                     return;
                 }
 
-                if (!e.IsSuccess && BrowserView.Visibility == Visibility.Visible && ActiveService is { } active)
-                    ShowServiceError(active, "Something went wrong while connecting to this service.", "WebView2 navigation status: " + e.WebErrorStatus);
+                if (!e.IsSuccess && e.WebErrorStatus.ToString() != "OperationCanceled" &&
+                    BrowserView.Visibility == Visibility.Visible && ActiveService is { } active)
+                    ShowNavigationError(active, e.WebErrorStatus, "WebView2 NavigationCompleted");
                 else if (e.IsSuccess)
                     _ = EnforceActiveCacheBudgetAsync(view, generation);
             };
@@ -586,7 +599,7 @@ public partial class MainWindow : Window
                 if (generation != _browserGeneration || !ReferenceEquals(_webView, view)) return;
                 _browserProcessFailed = true;
                 if (ActiveService is { } active)
-                    ShowServiceError(active, "The browser process stopped unexpectedly.", "WebView2 process failure: " + e.ProcessFailedKind);
+                    ShowServiceError(active, "The browser component stopped responding or closed unexpectedly.", "WebView2 process failure: " + e.ProcessFailedKind, "WebView2 ProcessFailed");
             });
             ApplyServiceSettings(view, service);
             view.CoreWebView2.Navigate(service.Url);
@@ -597,7 +610,7 @@ public partial class MainWindow : Window
             if (generation == _browserGeneration)
             {
                 _isBrowserLaunching = false;
-                ShowServiceError(service, "Monkey TV couldn't start the browser for this service.", ex.GetType().Name + ": " + ex.Message);
+                ShowServiceError(service, "Monkey TV couldn't start the browser for this service.", "Browser startup exception: " + ex.GetType().Name, "Monkey TV browser startup");
             }
         }
     }
@@ -770,18 +783,48 @@ public partial class MainWindow : Window
         _launchTimeoutTimer.Stop();
         if (!_launchTransitionActive || ActiveService is not { } service) return;
         try { _webView?.CoreWebView2?.Stop(); } catch { }
-        ShowServiceError(service, "This service took too long to respond.", "The initial navigation did not complete within 45 seconds.");
+        ShowServiceError(service, "The website did not finish loading within Monkey TV's navigation time limit.", "The initial navigation did not complete within 45 seconds.", "Monkey TV navigation timeout", timedOut: true);
     }
 
-    private void ShowServiceError(ServiceDefinition service, string message, string details)
+    private void ShowNavigationError(ServiceDefinition service, CoreWebView2WebErrorStatus status, string source)
+    {
+        var message = status.ToString() switch
+        {
+            "HostNameNotResolved" => "The website address couldn't be found.",
+            "CannotConnect" or "ServerUnreachable" => "Monkey TV couldn't connect to the website.",
+            "ConnectionRefused" => "The website refused the connection.",
+            "ConnectionAborted" or "ConnectionReset" or "Disconnected" => "The connection was interrupted.",
+            "Timeout" => "The website took too long to respond.",
+            "CertificateCommonNameIsIncorrect" or "CertificateExpired" or "CertificateIsInvalid" or "CertificateRevoked" => "Monkey TV couldn't establish a secure connection.",
+            "ErrorHttpInvalidServerResponse" => "The website returned an invalid server response.",
+            _ => "Monkey TV couldn't connect to the website."
+        };
+        ShowServiceError(service, message, "WebView2 navigation status: " + status, source, status.ToString());
+    }
+
+    private void ShowServiceError(ServiceDefinition service, string message, string details, string source = "Monkey TV", string? webErrorStatus = null, bool timedOut = false)
     {
         EndServiceLaunchTransition();
         LoadingOverlay.Visibility = Visibility.Collapsed; ErrorOverlay.Visibility = Visibility.Visible;
         SetBrowserMuted(_webView, true);
         if (_webView is not null) _webView.Visibility = Visibility.Collapsed;
-        ErrorTitle.Text = $"Couldn't load {service.Name}"; ErrorMessage.Text = message; ErrorDetails.Text = details;
+        ErrorTitle.Text = $"Couldn't load {service.Name}"; ErrorMessage.Text = message;
+        _lastErrorDiagnostic = BuildErrorDiagnostic(service, details, source, webErrorStatus, timedOut);
+        ErrorDetails.Text = _lastErrorDiagnostic;
         AppLog.Write("browser", $"{service.Name}: {details}");
         StopServiceUi();
+    }
+
+    private string BuildErrorDiagnostic(ServiceDefinition service, string details, string source, string? webErrorStatus, bool timedOut)
+    {
+        var configured = SafeDiagnosticUrl(service.Url) ?? "Not available";
+        return $"Monkey TV version: v{App.DisplayVersion} — Build #{App.BuildNumber}\nService: {service.Name}\nConfigured URL: {configured}\nFailing URL: {_lastNavigationUrl ?? "Not available"}\nError source: {source}\nWebErrorStatus: {webErrorStatus ?? "Not available"}\nHTTP status: Not available\nMonkey TV navigation timeout: {timedOut.ToString().ToLowerInvariant()}\nTimestamp: {DateTimeOffset.Now:O}\nDetails: {details}";
+    }
+
+    private static string? SafeDiagnosticUrl(string? value)
+    {
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)) return null;
+        return uri.GetLeftPart(UriPartial.Path);
     }
 
     private async Task EnforceActiveCacheBudgetAsync(WebView2 view, long generation)
@@ -812,6 +855,44 @@ public partial class MainWindow : Window
         BeginServiceLaunch(service);
         ApplyServiceSettings(_webView, service);
         _webView.CoreWebView2.Navigate(service.Url);
+    }
+
+    private void RestartActiveService()
+    {
+        if (ActiveService is not { } service || _webView?.CoreWebView2 is null) return;
+        BeginServiceLaunch(service);
+        ApplyServiceSettings(_webView, service);
+        _webView.CoreWebView2.Navigate(service.Url);
+    }
+
+    private async Task ResetActiveServiceSiteDataAsync()
+    {
+        if (ActiveService is not { } service || _webView?.CoreWebView2 is null) return;
+        var confirm = new ConfirmWindow($"Reset {service.Name} site data?",
+            $"This will sign you out of {service.Name} and remove its saved website cookies. {service.Name} will behave like it is being visited for the first time.\n\nThis cannot be undone.",
+            $"Reset {service.Name}", destructive: true) { Owner = this };
+        if (confirm.ShowDialog() != true) return;
+
+        var core = _webView.CoreWebView2;
+        foreach (var host in GetServiceResetHosts(service))
+        {
+            var cookies = await core.CookieManager.GetCookiesAsync("https://" + host + "/");
+            foreach (var cookie in cookies)
+                if (cookie.Domain.TrimStart('.').Equals(host, StringComparison.OrdinalIgnoreCase) || cookie.Domain.EndsWith("." + host, StringComparison.OrdinalIgnoreCase))
+                    core.CookieManager.DeleteCookie(cookie);
+        }
+        // This WebView2 version has no origin-scoped DOM-storage/IndexedDB clearing API.
+        // Disk cache is safe to clear globally; other provider cookies and site storage remain untouched.
+        await StorageService.ClearActiveDiskCacheAsync(core.Profile);
+        RestartActiveService();
+    }
+
+    private static IEnumerable<string> GetServiceResetHosts(ServiceDefinition service)
+    {
+        if (Uri.TryCreate(service.Url, UriKind.Absolute, out var uri)) yield return uri.Host;
+        if (service.FutureSettings.TryGetValue("KnownDomains", out var domains))
+            foreach (var domain in domains.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+                if (Uri.TryCreate("https://" + domain, UriKind.Absolute, out var known)) yield return known.Host;
     }
 
     private void DestroyBrowser()
@@ -1080,9 +1161,26 @@ public partial class MainWindow : Window
         _settings.CurrentLocationEnabled = true; _store.Save(_settings); RenderHome();
     }
     private void BrowserBack_Click(object sender, RoutedEventArgs e) { if (_webView?.CanGoBack == true) _webView.GoBack(); }
+    private void BrowserForward_Click(object sender, RoutedEventArgs e) { if (_webView?.CanGoForward == true) _webView.GoForward(); }
     private void BrowserReload_Click(object sender, RoutedEventArgs e) { _webView?.Reload(); }
     private async void BrowserHome_Click(object sender, RoutedEventArgs e) => await ReturnHomeAsync();
     private void Fullscreen_Click(object sender, RoutedEventArgs e) => ToggleApplicationFullscreen();
+
+    private void UpdateNavigationControls(WebView2? view = null)
+    {
+        view ??= _webView;
+        var canGoBack = view?.CanGoBack == true;
+        var canGoForward = view?.CanGoForward == true;
+        InlineBackButton.IsEnabled = canGoBack;
+        InlineForwardButton.IsEnabled = canGoForward;
+        _serviceControls.SetNavigationState(canGoBack, canGoForward, _serviceNavigationLoading);
+    }
+
+    private void CopyErrorDetails_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_lastErrorDiagnostic)) return;
+        try { Clipboard.SetText(_lastErrorDiagnostic); } catch { }
+    }
 
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
@@ -1126,7 +1224,9 @@ public partial class MainWindow : Window
         { if (_webView is not null) _webView.ZoomFactor = 1.0; e.Handled = true; return true; }
         if (e.Key == Key.Left && modifiers == ModifierKeys.Alt && serviceActive)
         { BrowserBack_Click(this, e); e.Handled = true; return true; }
-        if (e.Key == Key.R && modifiers == ModifierKeys.Control && serviceActive)
+        if (e.Key == Key.Right && modifiers == ModifierKeys.Alt && serviceActive)
+        { BrowserForward_Click(this, e); e.Handled = true; return true; }
+        if (((e.Key == Key.R && modifiers == ModifierKeys.Control) || (e.Key == Key.F5 && modifiers == ModifierKeys.None)) && serviceActive)
         { BrowserReload_Click(this, e); e.Handled = true; return true; }
         if (e.Key == Key.H && modifiers == ModifierKeys.Control && serviceActive)
         { e.Handled = true; _ = ReturnHomeAsync(); return true; }

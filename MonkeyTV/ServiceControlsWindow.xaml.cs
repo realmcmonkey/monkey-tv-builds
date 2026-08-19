@@ -13,9 +13,12 @@ public partial class ServiceControlsWindow : Window
     private bool _homeRequestPending;
 
     public event EventHandler? BackRequested;
+    public event EventHandler? ForwardRequested;
     public event EventHandler? ReloadRequested;
     public event EventHandler? HomeRequested;
     public event EventHandler? FullscreenRequested;
+    public event EventHandler? RestartRequested;
+    public event EventHandler? ResetSiteDataRequested;
     public event EventHandler? UserActivity;
 
     public ServiceControlsWindow()
@@ -76,9 +79,17 @@ public partial class ServiceControlsWindow : Window
         FullscreenButton.ToolTip = fullscreen ? "Exit application fullscreen (F11)" : "Enter application fullscreen (F11)";
     }
 
+    public void SetNavigationState(bool canGoBack, bool canGoForward, bool isLoading)
+    {
+        BackButton.IsEnabled = canGoBack;
+        ForwardButton.IsEnabled = canGoForward;
+        NavigationProgress.Visibility = isLoading ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     private void Surface_MouseEnter(object sender, MouseEventArgs e) => UserActivity?.Invoke(this, EventArgs.Empty);
     private void Surface_MouseMove(object sender, MouseEventArgs e) => UserActivity?.Invoke(this, EventArgs.Empty);
     private void Back_Click(object sender, RoutedEventArgs e) { UserActivity?.Invoke(this, EventArgs.Empty); BackRequested?.Invoke(this, EventArgs.Empty); }
+    private void Forward_Click(object sender, RoutedEventArgs e) { UserActivity?.Invoke(this, EventArgs.Empty); ForwardRequested?.Invoke(this, EventArgs.Empty); }
     private void Reload_Click(object sender, RoutedEventArgs e) { UserActivity?.Invoke(this, EventArgs.Empty); ReloadRequested?.Invoke(this, EventArgs.Empty); }
     private void Home_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e) => QueueHomeRequest();
     private void Home_Click(object sender, RoutedEventArgs e) => QueueHomeRequest();
@@ -96,4 +107,6 @@ public partial class ServiceControlsWindow : Window
         }));
     }
     private void Fullscreen_Click(object sender, RoutedEventArgs e) { UserActivity?.Invoke(this, EventArgs.Empty); FullscreenRequested?.Invoke(this, EventArgs.Empty); }
+    private void Restart_Click(object sender, RoutedEventArgs e) { UserActivity?.Invoke(this, EventArgs.Empty); RestartRequested?.Invoke(this, EventArgs.Empty); }
+    private void ResetSiteData_Click(object sender, RoutedEventArgs e) { UserActivity?.Invoke(this, EventArgs.Empty); ResetSiteDataRequested?.Invoke(this, EventArgs.Empty); }
 }
