@@ -1,43 +1,102 @@
-# Changelog
+# Monkey TV changelog
 
-## Unreleased development
-
-- Added one local-only Choose / Manage Services library built from the bundled service artwork. It offers only providers with included artwork, supports bulk enable/disable, custom-service addition, conservative duplicate warnings, and Restore Defaults for customized built-in copies.
-- Added Settings → Home service sorting. Automatic sort modes preserve the stored Custom drag order; Home drag-and-drop is active only in Custom mode.
+This is the detailed official release history. GitHub release pages contain a short summary and link here. Features described as requiring manual testing were not claimed as provider-verified.
 
 ## v0.04-alpha — Build #5
 
-- Split the built-in YouTube choice into **YouTube (Desktop)** (`https://www.youtube.com/`) and **YouTube (Smart TV Experience)** (`https://www.youtube.com/tv`), with separate stable definitions and the appropriate default Experience.
-- Updated Choose / Manage Services with an accessible On/Off switch, alphabetical built-in results, and cleaner service status presentation.
-- Fixed the service-view overflow menu so Restart Service and Reset Site Data reliably open from the three-dot control.
-- Strengthened Home-card hover and keyboard-focus feedback with a restrained accent border and shadow treatment, including Reduced Motion support.
-- Reworked Current Location selection into Direct/Last used/country/city flow using only the documented Nord SOCKS5 endpoint catalog. Location changes now cancel stale gateway connections so Nord → Direct → Nord reconnects cleanly.
-- Fixed Home Square artwork sizing and preserved each service's Fill/Fit behavior. Login redirects that report WebView2 `Unknown` during known provider auth flows no longer show a false error screen.
+### Manage Services and YouTube
 
-Known alpha limitations: Current Location remains browser-proxy routing, not a full-device VPN or an absolute WebRTC/UDP leak-proof boundary. A provider's catalog availability may depend on account, licensing, cookies, or other signals in addition to network location. Real Nord credentials, endpoint availability, streaming playback, and provider login flows require hands-on testing.
+- Split the previous generic YouTube template into two independent built-in services with stable IDs: **YouTube (Desktop)** (`https://www.youtube.com/`, Default Experience) and **YouTube (Smart TV Experience)** (`https://www.youtube.com/tv`, TV Experience).
+- Kept both definitions on the existing bundled YouTube artwork rather than adding duplicate image files to portable data.
+- Safely migrated only an untouched legacy built-in YouTube entry to the Desktop name. Manually created or edited YouTube services are not renamed, converted, or overwritten.
+- Replaced the dated `Enabled` checkbox in Choose / Manage Services with a compact, right-aligned, keyboard-focusable On/Off switch. Status text now communicates only additional information such as customized or pending removal.
+- Sorted the full built-in library and all search/region-filtered results alphabetically by service name.
+
+### Service view and Home cards
+
+- Fixed the service-view three-dot menu. It now explicitly opens its menu on mouse click or keyboard activation and exposes the existing **Restart Service** and **Reset Site Data** actions repeatedly.
+- Strengthened Home-card hover and keyboard-focus feedback using a restrained accent border, slightly stronger shadow, existing 1.02 scale, and 2–3 px lift. Reduced Motion applies the state change without unnecessary animation.
+- Restored correct Square card sizing. Home now uses 16:9 dimensions only for Banner cards and a square content area for Square cards.
+- Preserved each service's Banner Fit setting: **Fit** keeps all artwork visible; **Fill** uses aspect-preserving crop to cover the card without distortion.
+
+### Current Location
+
+- Replaced the flat location menu with a simple two-step selector: Direct and Last used on the first view, then documented countries A–Z, then a selected country’s documented city/location entries A–Z.
+- Selecting a country only opens its location choices. It does not connect until the user chooses a location and presses **Connect**. Direct and Last used remain immediate choices.
+- Deliberately omitted a fake “Fastest Server” choice because Monkey TV does not use an undocumented Nord API to claim server recommendations.
+- Fixed the gateway route lifecycle so Nord → Direct → the same Nord location cancels stale upstream connections and can reconnect without restarting Monkey TV or re-entering credentials.
+- The fixed WebView2 loopback proxy boundary continues to apply to normal HTTP/HTTPS browser traffic; QUIC remains disabled and WebRTC uses the existing best-effort non-proxied-UDP restriction. This does not prove that any specific provider’s catalog is determined only by IP location.
+
+### Navigation errors
+
+- Added a narrow auth-redirect classification for known related/login/account URLs. A WebView2 `Unknown` completion during such a transitional provider login redirect no longer immediately replaces the provider flow with Monkey TV’s error screen.
+- Confirmed failures, unrelated `Unknown` navigations, connection errors, security errors, explicit navigation timeouts, and process failures still use the existing error UI and technical details.
+
+### Known alpha limitations
+
+- Current Location is browser-proxy routing, not a full-device VPN or an absolute WebRTC/UDP leak-proof boundary.
+- Nord service credential authentication, real endpoint availability, WebView external-IP observation, provider login redirects, geo-catalog availability, DRM playback, and streaming playback require hands-on testing. Provider availability may also depend on account, licensing, cookies, and other provider signals.
 
 ## v0.04-alpha — Build #4
 
-- Fixed a first-run/runtime crash in Choose / Manage Services caused by the region filter firing before its service collection was initialized.
+- Fixed `ManageServicesWindow` crashing with `ArgumentNullException` when WPF raised `ComboBox.SelectionChanged` during constructor/XAML initialization before the service collection was available.
+- Initialize the settings, store, and built-in service item collection before `InitializeComponent`, enable filter handling only once controls are ready, and guard Refresh against early/null controls.
+- This makes Choose / Manage Services available during first-run setup and normal Home/Settings access without relying on WPF event timing.
 
 ## v0.04-alpha — Build #3
 
-- Fixed the splash screen so it closes before the alpha warning, first-run setup, and other startup dialogs can appear.
+- Fixed the branded splash window staying above startup UI indefinitely when the alpha warning, first-run setup, recovery, or another startup dialog appeared.
+- The splash now closes before startup dialogs are presented while retaining its minimum display behavior during normal Home initialization.
 
 ## v0.04-alpha — Build #2
 
-- Added the polished Home launcher, local default/manage-services library, service-view navigation controls and error details, Settings organization, Storage and Recovery hardening, and the Home Escape behavior completed during the unreleased v0.04 development cycle.
+### Escape and Home launcher
+
+- Corrected Escape ownership while a service is active: Escape is forwarded to the provider/WebView instead of exiting Monkey TV application fullscreen.
+- On Home, Escape returns to the suspended active service when appropriate, preserving the existing same-service resume behavior.
+- Redesigned Home as a focused streaming-service launcher with responsive large 16:9 cards, stable incomplete rows, vertical scrolling, empty state actions, restrained hover/press feedback, and direct custom-order drag/drop support.
+
+### Built-in service library
+
+- Added the local-only Choose / Manage Services library, limited to services for which Monkey TV ships official bundled artwork.
+- Added built-in service IDs, template URLs, regions, artwork references, default Experience values, duplicate warnings, enable/disable staging, Restore Defaults for customized built-in copies, and custom-service entry through the existing editor.
+- Added Settings → Home sorting choices: Custom, A–Z, Z–A, newest first, and oldest first. Automatic modes do not overwrite the saved Custom order; returning to Custom restores it.
+
+### Service/browser view
+
+- Added Forward alongside Back and keeps Back/Forward disabled when the shared WebView history cannot perform that action.
+- Added a subtle navigation progress indicator in the service overlay.
+- Added Restart Service, which navigates the active service to its configured start URL without clearing provider cookies or website data.
+- Added Reset Site Data with destructive confirmation and conservative service-domain handling, distinct from non-destructive temporary-cache cleanup.
+- Expanded service error screens with human-readable classifications, Retry/Home actions, expandable technical details, and Copy Details without secrets, cookies, tokens, or credentials.
+
+### Settings, storage, and recovery
+
+- Organized Settings into General, Home, Appearance, Streaming, Storage, and About while keeping the control set intentionally small.
+- Added/retained theme, accent, motion, service card shape/size, names, sorting, external-link behavior, new-custom-service Experience, permission-reset information, portable data access, logs, diagnostic copy, backup/restore, and destructive reset actions.
+- Hardened Storage and Recovery with clear distinctions between Clear Temporary Data, Reset Current Site Data, Reset All Website Data, and Reset Monkey TV.
+- Added bounded known-good configuration backups, configuration validation before use, recovery from compatible backups, preservation of damaged configuration, recovery UI, defensive migration backups, and conservative repeated-startup recovery mode.
+
+### Known alpha limitations
+
+- Provider-specific site-data clearing depends on supported WebView2 APIs and conservative domain metadata; unusual multi-domain authentication flows need manual testing.
+- Home, drag/drop, popup/auth routing, fullscreen, provider logins, protected playback, and real streaming playback require hands-on Windows testing.
 
 ## v0.04-alpha — Build #1
 
-- Added optional **Current Location** setup: users can configure NordVPN service credentials during first-run setup or skip the feature entirely.
-- Added the optional Home Current Location control and Settings visibility switch. Turning it off safely returns Monkey TV to Direct before hiding the control; saved credentials remain available if re-enabled later.
-- Added global manual browser-level geographic routing through NordVPN's officially documented SOCKS5 locations, using a fixed Monkey TV loopback gateway and one shared WebView2/profile.
-- Current Location always begins as Direct on every launch. Nord is never reconnected, checked, or contacted automatically; a previous successful location is only an inactive Last used choice.
-- Route changes verify before a visible service is reloaded. Failed Nord routes remain blocked rather than silently falling back to Direct.
-- Nord credentials use Windows DPAPI and are excluded from logs, diagnostics, backups, exports, and packages. Added official service-credential guidance links.
+### Current Location (Feature #0.01)
 
-Known alpha limitations: Current Location is browser-proxy routing only, not a full device VPN or absolute WebRTC/UDP leak-proof boundary. Real Nord authentication, endpoint availability, provider playback, and WebRTC behavior require manual testing with valid service credentials.
+- Added optional **Current Location** setup using NordVPN service credentials for browser-level geographic routing. The NordVPN Windows app is not required.
+- Added a fixed Monkey TV loopback gateway and configured Monkey TV’s one shared WebView2 environment to use that local routing boundary. Other Windows applications are not intentionally routed through it.
+- Added globally selected Direct/Nord route state, documented Nord SOCKS5 locations, DPAPI-protected service credentials, route verification before service reload/navigation, fail-closed behavior for failed Nord selection, and clean gateway shutdown.
+- Current Location always begins in **Direct** on every startup. Monkey TV never reconnects Nord, checks Nord endpoints, loads a service, or contacts a provider automatically at startup.
+- Added optional Home visibility for the Current Location control. Hiding it safely returns an active Nord route to Direct first and does not delete saved credentials.
+- Added first-run setup guidance that asks for Nord **service credentials**, not the normal Nord account password, and opens official Nord instructions in the Windows default browser.
+
+### Known alpha limitations
+
+- Current Location is a browser proxy, not a full system VPN and not an absolute zero-leak boundary.
+- WebRTC protection is best-effort, QUIC is disabled only for Monkey TV’s WebView environment, and real Nord authentication, provider compatibility, DRM playback, and location behavior need manual testing.
 
 ## v0.0.3-alpha — Build #2
 
@@ -52,44 +111,51 @@ Known alpha limitation: automatic artwork matching is intentionally conservative
 
 ## v0.0.3-alpha — Build #1
 
-- Added a fast Fluent-inspired startup splash and kept startup provider-free: no WebView, service navigation, or provider contact occurs until a service is selected.
-- Added persisted normal/maximized window placement with disconnected-monitor recovery and improved smaller-window Settings/Home layout.
-- Added System, Light, and Dark themes plus restrained accent choices across Monkey TV UI; replaced the shared ComboBox template to fix unreadable closed and open dropdown text.
-- Polished service launch/error/shutdown surfaces for the selected theme and restored a visible `Shutting down Monkey TV…` state during asynchronous cleanup.
-- Added controlled, same-profile temporary WebView2 windows for user-initiated related/auth popups; unrelated user-initiated popup links open in the Windows default browser rather than becoming tabs.
-- Added conservative session-only camera, microphone, location, and clipboard permission prompts; notifications and unrelated privileged requests are denied, while autoplay remains available for streaming.
-- Added explicit website download handling through the Windows Save dialog outside portable `Data`, and prevented persistent accidental browser zoom.
-- Preserved the single service WebView/profile, same-service resume, different-service transition, cache lifecycle, fullscreen, and portable storage architecture.
+- Added a Fluent-inspired startup splash and preserved provider-free startup: no WebView, service navigation, or provider contact occurs until a service is selected.
+- Added persisted normal/maximized window placement with disconnected-monitor recovery, sensible minimum sizing, and responsive Home/Settings layouts.
+- Added System, Light, and Dark themes plus restrained accent choices across Monkey TV UI; fixed shared ComboBox styling so closed and open dropdown text remains readable in all themes.
+- Added startup/shutdown polish including visible launch, error, and clean shutdown states.
+- Added controlled, same-profile temporary WebView2 windows for user-initiated related/auth popups; unrelated user-initiated links open in the Windows default browser instead of becoming tabs.
+- Added conservative session-only camera, microphone, location, and clipboard prompts; notifications and unsupported privileged requests are denied, while autoplay remains available for streaming.
+- Added explicit browser download handling through the Windows Save dialog outside portable `Data` and prevented persistent accidental browser zoom.
 
-Known alpha limitations: real provider authentication/popup behavior, protected playback, website fullscreen, and permission requirements still need manual account testing. Domain/auth routing is intentionally conservative and may send an unusual legitimate external flow to the default browser.
+Known alpha limitations: protected playback, provider sign-in/popup flows, website fullscreen, and provider-specific permission requirements require manual account testing.
 
 ## v0.0.2-alpha — Build #3
 
-- Added a native launch transition when switching services so the previous website is hidden immediately while the shared WebView navigates; failed or stuck launches flow into Monkey TV's existing Retry/Home error state.
-- Fixed the auto-hiding service overlay and strengthened its Home control for mouse and accessibility activation.
-- Home now immediately mutes and hides the active service. Standard on-demand HTML media is paused and marked for automatic same-service resume; clearly detectable live media stays active but muted so its provider can maintain live position.
-- Preserved same-service page state and cache when returning from Home. Switching to a different service clears supported disposable disk cache before navigating the shared WebView.
-- Changed temporary-browser-data control to a 100 MiB soft target checked every five minutes. Checks read file metadata only; cleanup uses WebView2's supported disk-cache API and preserves cookies, site storage, logins, and protected provider state.
-- Expanded lifecycle test coverage and documentation for launch transitions, Home suspension, cache behavior, and limitations of generic live-player detection.
+- Added the native “Launching [Service]…” transition when switching services so the previous website is hidden before the shared WebView starts its new navigation.
+- Added transition artwork/initial fallback, supported navigation-completion reveal, launch timeout recovery, and Retry/Home errors for failed or stuck launches.
+- Fixed the auto-hiding service overlay and strengthened its Home action for mouse, keyboard, and accessibility activation.
+- Home now immediately mutes and hides the active service. Standard finite HTML media is paused and recorded for same-service resume; clearly detectable live media remains running but muted so providers can preserve live position.
+- Preserved same-service page state and cache. Switching to a different service clears supported disposable disk cache before the one shared WebView navigates.
+- Set the portable temporary-cache soft target to 100 MiB with a lightweight metadata check every five minutes during active service use. Cleanup preserves cookies, site storage, logins, and protected provider state.
+
+Known alpha limitation: live-media and custom-player detection is best effort; inaccessible provider players may only be muted and hidden.
 
 ## v0.0.2-alpha — Build #2
 
-- Changed service viewing to one reusable WebView2 and one shared persistent browser profile for all services; same-service Home resumes the existing page, while a different service reuses that WebView and navigates to its destination.
-- Conservatively migrated Build #1 profile settings without copying cookies, credentials, or DRM state. Older profile folders remain on disk for recovery and may require a one-time provider login in the unified profile.
-- Ensured per-service Default, TV, and advanced custom user agents are applied before each destination navigation, including restoring the captured default identity after TV Experience.
-- Fixed the service controls overlay so it repeatedly hides after inactivity without requiring a click; removed Home drag-and-drop ordering.
+- Changed service viewing to one reusable WebView2 and one shared persistent browser profile for all services.
+- Returning Home preserves and hides the current page for same-service resume. Choosing a different service reuses that same WebView and navigates it away; Monkey TV does not create another service WebView or profile.
+- Conservatively migrated Build #1 named-profile settings without copying cookies, credentials, or DRM state. Old profile folders remain available for manual recovery and users may need to sign in once in the unified profile.
+- Applied each service’s Default Experience, TV Experience, or advanced custom user agent before its destination navigation, and restores the captured normal WebView identity after TV Experience.
+- Fixed overlay auto-hide so it repeatedly hides after inactivity without requiring a click. Top-edge reveal, cursor behavior, F11, Escape, and browser shortcuts were preserved.
 - Updated Storage to report shared browser data honestly rather than fabricated per-service totals.
 
 ## v0.0.2-alpha — Build #1
 
-- Reworked Home with responsive Banner and Square service cards, improved artwork handling, and drag-and-drop ordering.
-- Fixed service lifecycle behavior: returning Home preserves only the current service for same-service resume; switching services disposes the previous WebView before loading the next one.
-- Added Default Experience and TV Experience, including a centralized smart-TV user agent and optional advanced custom override.
-- Added true application fullscreen, coordinated website fullscreen handling, auto-hiding service controls, and cursor hiding during inactive service viewing.
-- Added friendly offline/navigation failure screens, keyboard shortcuts, service context actions, and expanded service/banner management.
-- Added configuration backup/restore, recovery messaging, Storage and About pages, bounded diagnostics, and update architecture groundwork.
-- Reduced portable browser-data growth with shared named WebView2 profiles for new services, safe cache cleanup, a 192 MiB soft temporary-cache budget, and storage-management controls.
+- Added responsive Home Banner and Square service cards, artwork import/selection, manual banner override, fit behavior, and portable artwork storage.
+- Added service lifecycle rules for Home/switching, Default Experience and TV Experience with one centralized Smart TV user agent, and an optional advanced per-service custom user-agent override.
+- Added true application fullscreen, coordinated website fullscreen handling, auto-hiding service controls, cursor hiding, subtle browser overlay navigation, and F11/Escape handling.
+- Added friendly offline/navigation failure screens, browser Back/Reload/Home controls, keyboard shortcuts, service context actions, and service add/edit/remove/reorder management.
+- Added configuration export/import excluding browser-profile data; recovery messaging; Storage and About pages; bounded diagnostics; crash marker handling; and update architecture groundwork.
+- Added portable-data controls, artwork optimization, bounded logs, cache cleanup, and storage reporting. This early build used named WebView2 profiles before Build #2 moved new launches to one shared profile.
 
-## v0.0.1-alpha
+## v0.0.1-alpha — Build #2
 
-- Initial proof-of-concept release: portable service setup, Home launcher, WebView2 service viewing, per-service profiles, and basic settings.
+- Fixed the initial service lifecycle/switching implementation and prepared the early portable alpha for testing with multiple configured streaming services.
+- Retained configured services and portable Data while correcting active service behavior from Home during the early proof-of-concept phase.
+
+## v0.0.1-alpha — Build #1
+
+- Initial portable proof of concept: alpha warning, first-run service setup, generic custom service configuration, Home launcher, WebView2 service viewing, basic settings, per-service browser identity options, and portable Data beside the executable.
+- Established the project’s legitimate streaming-launcher scope: provider accounts, subscriptions, DRM, and playback remain owned by the provider; Monkey TV does not host, download, decrypt, capture, or bypass protected content.
