@@ -456,11 +456,8 @@ public partial class MainWindow : Window
                     e.Handled = true;
                     Dispatcher.BeginInvoke(ToggleApplicationFullscreen);
                 }
-                else if (e.Key == Key.Escape && !_websiteFullscreen && _appFullscreen)
-                {
-                    e.Handled = true;
-                    Dispatcher.BeginInvoke(() => SetApplicationFullscreen(false));
-                }
+                // Escape is deliberately not handled here. While a service is visible the
+                // website owns Escape, including in Monkey TV application fullscreen.
             };
             view.CoreWebView2.NewWindowRequested += WebView_NewWindowRequested;
             view.CoreWebView2.PermissionRequested += WebView_PermissionRequested;
@@ -1028,6 +1025,9 @@ public partial class MainWindow : Window
     {
         if (HandleApplicationShortcut(e)) return;
         if (e.Key == Key.F11) { ToggleApplicationFullscreen(); e.Handled = true; }
+        // A visible service owns Escape. Do not use application fullscreen as a reason to
+        // consume it: TV/web players need the same Escape behavior as in a normal window.
+        else if (e.Key == Key.Escape && _webView is not null && BrowserView.Visibility == Visibility.Visible) { return; }
         else if (e.Key == Key.Escape && _websiteFullscreen) { return; }
         else if (e.Key == Key.Escape && _appFullscreen) { SetApplicationFullscreen(false); e.Handled = true; }
         else if (e.Key == Key.Escape && SearchContainer.Visibility == Visibility.Visible) { CloseSearch_Click(this, e); e.Handled = true; }
