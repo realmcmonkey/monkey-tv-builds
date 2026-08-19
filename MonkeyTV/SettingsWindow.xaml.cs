@@ -194,6 +194,34 @@ public partial class SettingsWindow : Window
         BrowserPersistentStorageText.Text = StorageService.FormatBytes(snapshot.BrowserPersistentBytes);
         BrowserTemporaryStorageText.Text = StorageService.FormatBytes(snapshot.BrowserTemporaryBytes);
         LogsStorageText.Text = StorageService.FormatBytes(snapshot.LogBytes);
+        DataLocationText.Text = PortablePaths.DataRoot;
+        LastBackupText.Text = ConfigurationRecoveryService.LastKnownGoodUtc is { } timestamp
+            ? "Last successful automatic backup: " + timestamp.ToLocalTime().ToString("g")
+            : "No automatic configuration backup has been created yet.";
+    }
+
+    private void ChangeDataLocation_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFolderDialog { Title = "Choose a new Monkey TV Data location" };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            (Owner as MainWindow)?.PrepareForConfigurationImport();
+            PortablePaths.ChangeDataRoot(dialog.FolderName);
+            _store.Save(_settings); RefreshStorage(); StorageStatusText.Text = "Data was copied to the new location. The previous portable Data folder was left intact for safety.";
+        }
+        catch (Exception ex) { AppLog.Write("storage", ex.Message); StorageStatusText.Text = "Monkey TV could not move Data to that location."; }
+    }
+
+    private void UseDefaultDataLocation_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            (Owner as MainWindow)?.PrepareForConfigurationImport();
+            PortablePaths.ChangeDataRoot(PortablePaths.DefaultDataRoot);
+            _store.Save(_settings); RefreshStorage(); StorageStatusText.Text = "Monkey TV is using its default portable Data folder.";
+        }
+        catch (Exception ex) { AppLog.Write("storage", ex.Message); StorageStatusText.Text = "Monkey TV could not return Data to its default location."; }
     }
 
     private static void OpenFolder(string path)
@@ -234,6 +262,16 @@ public partial class SettingsWindow : Window
     {
         var confirmation = new ConfirmWindow("Reset Monkey TV?", "This permanently removes Monkey TV services, application settings, imported artwork, browser profiles, and streaming-service logins. It does not delete unrelated files outside Monkey TV's portable Data folder.\n\nYou will return to first-time setup. This cannot be undone.", "Reset Monkey TV", destructive: true) { Owner = this };
         if (confirmation.ShowDialog() != true) return;
+        if (BackupBeforeResetCheck.IsChecked == true)
+        {
+            try
+            {
+                var dialog = new SaveFileDialog { Filter = "Monkey TV backup|*.mtvbackup", FileName = $"MonkeyTV-pre-reset-{DateTime.Now:yyyy-MM-dd}.mtvbackup", AddExtension = true };
+                if (dialog.ShowDialog(this) != true) { StorageStatusText.Text = "Monkey TV was not reset because the requested backup was not saved."; return; }
+                BackupService.Export(dialog.FileName, _settings);
+            }
+            catch { StorageStatusText.Text = "The requested backup could not be created. Monkey TV was not reset."; return; }
+        }
         (Owner as MainWindow)?.ResetMonkeyTv();
         Close();
     }
@@ -255,6 +293,7 @@ public partial class SettingsWindow : Window
             var preview = BackupService.Validate(dialog.FileName);
             var confirmation = new ConfirmWindow("Import configuration?", $"Replace the current configuration with {preview.Settings.Services.Count} service(s) and its appearance settings? Streaming logins are not included.", "Import") { Owner = this };
             if (confirmation.ShowDialog() != true) return;
+            ConfigurationRecoveryService.CreateKnownGood(_settings, force: true);
             (Owner as MainWindow)?.PrepareForConfigurationImport();
             _settings = BackupService.Import(preview, _store); RefreshList();
             CardStyleBox.SelectedIndex = (int)_settings.CardStyle; TileSizeBox.SelectedIndex = (int)_settings.TileSize;

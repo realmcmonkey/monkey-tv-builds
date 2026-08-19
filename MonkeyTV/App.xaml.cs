@@ -44,13 +44,36 @@ public partial class App : Application
             splash = new SplashWindow();
             splash.Show();
             Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
+            PortablePaths.InitializeDataRoot();
             PortablePaths.EnsureCreated();
             StorageService.CleanupQueuedSharedProfileDeletes();
-            var recoveredFromUncleanExit = SessionMarker.Begin();
+            var startupState = SessionMarker.Begin();
             StorageService.ClearAllTemporaryData();
             var store = new SettingsStore();
             var settings = store.Load();
             ThemeService.Initialize(settings);
+
+            if (store.LastLoadOutcome == SettingsLoadOutcome.Unrecoverable)
+            {
+                var recovery = new RecoveryWindow(RecoveryMode.ConfigurationFailure);
+                if (recovery.ShowDialog() != true) { Shutdown(); return; }
+                if (recovery.Choice == RecoveryChoice.Restore)
+                {
+                    if (!ConfigurationRecoveryService.TryRestoreLatest(out var restored, out _)) { Shutdown(); return; }
+                    settings = restored; store.Save(settings);
+                }
+                else if (recovery.Choice == RecoveryChoice.Fresh) { StorageService.ResetMonkeyTvData(); settings = new MonkeySettings(); store.Save(settings); }
+                else { Shutdown(); return; }
+            }
+            else if (store.LastLoadOutcome == SettingsLoadOutcome.Recovered)
+                new RecoveryWindow(RecoveryMode.RecoveredConfiguration, store.LastRecoveryFile).ShowDialog();
+            else if (startupState.ConsecutiveFailures >= 3)
+            {
+                var recovery = new RecoveryWindow(RecoveryMode.RepeatedStartup);
+                recovery.ShowDialog();
+                if (recovery.Choice == RecoveryChoice.Restore && ConfigurationRecoveryService.TryRestoreLatest(out var restored, out _)) { settings = restored; store.Save(settings); }
+                else if (recovery.Choice == RecoveryChoice.Fresh) { StorageService.ResetMonkeyTvData(); settings = new MonkeySettings(); store.Save(settings); }
+            }
 
             // Keep the branded splash unobscured for the requested minimum. Any genuinely
             // slower startup naturally keeps it visible longer without loading WebView2.
@@ -75,7 +98,7 @@ public partial class App : Application
                 settings = store.Load();
             }
 
-            if (recoveredFromUncleanExit && settings.SetupComplete)
+            if (startupState.Unclean && startupState.ConsecutiveFailures < 3 && settings.SetupComplete)
                 new RecoveryWindow().ShowDialog();
 
             var main = new MainWindow(settings, store);
@@ -90,6 +113,7 @@ public partial class App : Application
                 }
                 startup.Stop();
                 LastStartupMilliseconds = startup.ElapsedMilliseconds;
+                SessionMarker.MarkStartupSuccessful();
                 main.ApplyStartupPreferences();
             };
             main.Show();

@@ -9,22 +9,35 @@ public sealed class SettingsStore
         WriteIndented = true,
         PropertyNameCaseInsensitive = true
     };
+    public SettingsLoadOutcome LastLoadOutcome { get; private set; }
+    public string? LastRecoveryFile { get; private set; }
 
     public MonkeySettings Load()
     {
+        LastLoadOutcome = SettingsLoadOutcome.Valid; LastRecoveryFile = null;
         if (!File.Exists(PortablePaths.SettingsFile)) return new MonkeySettings();
         try
         {
             var settings = JsonSerializer.Deserialize<MonkeySettings>(File.ReadAllText(PortablePaths.SettingsFile), JsonOptions)
                            ?? new MonkeySettings();
-            if (Migrate(settings)) Save(settings);
+            ValidateSettings(settings);
+            if (Migrate(settings))
+            {
+                ConfigurationRecoveryService.CreateKnownGood(settings, force: true);
+                Save(settings);
+            }
             return settings;
         }
         catch (Exception ex)
         {
-            var backup = PortablePaths.SettingsFile + ".invalid-backup";
-            File.Copy(PortablePaths.SettingsFile, backup, true);
+            ConfigurationRecoveryService.PreserveDamagedConfiguration();
             AppLog.Write("settings", ex.Message);
+            if (ConfigurationRecoveryService.TryRestoreLatest(out var recovered, out var backup))
+            {
+                LastLoadOutcome = SettingsLoadOutcome.Recovered; LastRecoveryFile = backup;
+                Save(recovered); return recovered;
+            }
+            LastLoadOutcome = SettingsLoadOutcome.Unrecoverable;
             return new MonkeySettings();
         }
     }
@@ -90,5 +103,18 @@ public sealed class SettingsStore
         var temp = PortablePaths.SettingsFile + ".tmp";
         File.WriteAllText(temp, JsonSerializer.Serialize(settings, JsonOptions));
         File.Move(temp, PortablePaths.SettingsFile, true);
+        ConfigurationRecoveryService.CreateKnownGood(settings);
+    }
+
+    internal static void ValidateSettings(MonkeySettings settings)
+    {
+        if (settings.Services is null || settings.Services.Count > 500) throw new InvalidDataException("The service list is invalid.");
+        if (settings.Services.Select(s => s.Id).Distinct().Count() != settings.Services.Count) throw new InvalidDataException("Duplicate service identifiers.");
+        foreach (var service in settings.Services)
+            if (service.Id == Guid.Empty || string.IsNullOrWhiteSpace(service.Name) || service.Name.Length > 200 ||
+                !Uri.TryCreate(service.Url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
+                throw new InvalidDataException("An invalid service was found.");
     }
 }
+
+public enum SettingsLoadOutcome { Valid, Recovered, Unrecoverable }
