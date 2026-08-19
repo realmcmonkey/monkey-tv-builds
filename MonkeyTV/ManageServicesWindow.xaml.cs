@@ -12,17 +12,24 @@ public partial class ManageServicesWindow : Window
     private readonly SettingsStore _store;
     private readonly List<ManageServiceItem> _items;
     private readonly List<ServiceDefinition> _pendingCustom = new();
+    private bool _filtersReady;
 
     public ManageServicesWindow(MonkeySettings settings, SettingsStore store)
     {
-        InitializeComponent(); _settings = settings; _store = store;
+        // XAML assigns ComboBox content while InitializeComponent runs, which can raise
+        // SelectionChanged before controls are fully initialized. Build all filter data first.
+        _settings = settings; _store = store;
+        _items = BuiltInServiceCatalog.All.Select(template => new ManageServiceItem(template,
+            _settings.Services.FirstOrDefault(service => service.BuiltInServiceId == template.Id))).ToList();
+        InitializeComponent();
         RegionBox.SelectedIndex = 0;
-        _items = BuiltInServiceCatalog.All.Select(template => new ManageServiceItem(template, _settings.Services.FirstOrDefault(service => service.BuiltInServiceId == template.Id))).ToList();
+        _filtersReady = true;
         Refresh();
     }
 
     private void Refresh()
     {
+        if (!_filtersReady || _items is null || SearchBox is null || RegionBox is null || ServicesList is null) return;
         var term = SearchBox.Text?.Trim() ?? "";
         var region = (RegionBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "All";
         ServicesList.ItemsSource = _items.Where(item => (region == "All" || item.Template.Region == region) && item.Template.Name.Contains(term, StringComparison.CurrentCultureIgnoreCase)).ToList();

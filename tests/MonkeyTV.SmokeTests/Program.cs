@@ -9,8 +9,8 @@ static void Require(bool condition, string message)
 
 PortablePaths.EnsureCreated();
 Require(App.DisplayVersion == "0.04-alpha", "Release version metadata is incorrect.");
-Require(App.BuildNumber == "3", "Build #3 metadata is incorrect.");
-Require(App.AlphaWarningKey == "0.04-alpha-build-3", "Alpha warning is not keyed to v0.04 Build #3.");
+Require(App.BuildNumber == "4", "Build #4 metadata is incorrect.");
+Require(App.AlphaWarningKey == "0.04-alpha-build-4", "Alpha warning is not keyed to v0.04 Build #4.");
 Require(NordLocationCatalog.All.Count >= 3, "Nord location catalog is missing documented presets.");
 Require(NordLocationCatalog.Get(NordLocationId.UnitedStates).Host == "us.socks.nordhold.net", "Documented Nord US SOCKS host changed unexpectedly.");
 var locationSettings = new MonkeySettings { LastUsedNordLocation = NordLocationId.NewYork };
@@ -28,6 +28,7 @@ await using (var directRouter = new CurrentLocationRouter())
 Require(BuiltInArtworkCatalog.All.Count == 46, "The built-in artwork catalog is incomplete.");
 Require(BuiltInServiceCatalog.All.Count == BuiltInArtworkCatalog.All.Count, "Manage Services does not match the bundled artwork library.");
 Require(BuiltInServiceCatalog.All.All(service => BuiltInArtworkCatalog.TryGet(service.ArtworkReference) is not null), "A built-in service has no bundled artwork.");
+
 var builtInYouTubeTv = BuiltInServiceCatalog.Find("general/youtube-tv") ?? throw new InvalidOperationException("YouTube TV built-in definition is missing.");
 var builtInCopy = builtInYouTubeTv.Create();
 Require(builtInCopy.BuiltInServiceId == builtInYouTubeTv.Id && builtInCopy.BannerPath == builtInYouTubeTv.ArtworkReference, "Built-in service template was not applied.");
