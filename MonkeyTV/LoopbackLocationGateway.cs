@@ -20,6 +20,7 @@ internal sealed class LoopbackLocationGateway : IAsyncDisposable
     public void SetDirect() => ChangeRoute(GatewayRoute.Direct);
     public void SetDeny() => ChangeRoute(GatewayRoute.Deny);
     public void SetNord(NordLocation location, NordCredentials credentials) => ChangeRoute(new GatewayRoute(location, credentials));
+    public void SetVpnV2(int loopbackPort) => ChangeRoute(new GatewayRoute(null, null, false, loopbackPort));
 
     private void ChangeRoute(GatewayRoute route)
     {
@@ -77,6 +78,22 @@ internal sealed class LoopbackLocationGateway : IAsyncDisposable
 
     private static async Task<TcpClient> ConnectAsync(GatewayRoute route, string host, int port, CancellationToken token)
     {
+        if (route.VpnV2Port is { } proxyPort)
+        {
+            var tunnel = new TcpClient(AddressFamily.InterNetwork);
+            try
+            {
+                await tunnel.ConnectAsync(IPAddress.Loopback, proxyPort, token);
+                var stream = tunnel.GetStream();
+                var request = Encoding.ASCII.GetBytes($"CONNECT {host}:{port} HTTP/1.1\r\nHost: {host}:{port}\r\n\r\n");
+                await stream.WriteAsync(request, token);
+                var response = await ReadHeaderAsync(stream, token);
+                if (response is null || !response.StartsWith("HTTP/1.1 200", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("The experimental VPN gateway rejected the destination.");
+                return tunnel;
+            }
+            catch { tunnel.Dispose(); throw; }
+        }
         if (route.Location is null)
         {
             var direct = new TcpClient(); await direct.ConnectAsync(host, port, token); return direct;
@@ -129,6 +146,6 @@ internal sealed class LoopbackLocationGateway : IAsyncDisposable
     }
     private static Task RespondAsync(NetworkStream stream, int code, string text, CancellationToken token) => stream.WriteAsync(Encoding.ASCII.GetBytes($"HTTP/1.1 {code} {text}\r\nConnection: close\r\n\r\n"), token).AsTask();
     public async ValueTask DisposeAsync() { _routeConnections.Cancel(); _stop.Cancel(); _listener.Stop(); if (_acceptLoop is not null) try { await _acceptLoop; } catch { } _routeConnections.Dispose(); _stop.Dispose(); }
-    private sealed record GatewayRoute(NordLocation? Location, NordCredentials? Credentials, bool IsDeny = false)
+    private sealed record GatewayRoute(NordLocation? Location, NordCredentials? Credentials, bool IsDeny = false, int? VpnV2Port = null)
     { public static GatewayRoute Direct { get; } = new(null, null); public static GatewayRoute Deny { get; } = new(null, null, true); }
 }

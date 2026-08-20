@@ -2,13 +2,13 @@
 
 Monkey TV is a portable Windows streaming-service launcher. It opens one configured website at a time in one reusable Microsoft Edge WebView2. Home immediately mutes and hides the active service, then suspends it so the same service can resume where it was left; choosing a different service hides that WebView behind a launch transition and navigates the same instance to the new destination. It does not host, download, capture, decrypt, or modify streaming content.
 
-Current version: **v0.04-alpha — Build #1**
+Current version: **v0.05-alpha — Build #1**
 
 ## Try the packaged alpha
 
-Extract the release ZIP to a writable folder on a Windows 11 x64 PC, then run `MonkeyTV.exe`. Keep the EXE and `Data` folder together. The app creates its portable configuration, icons, cache, and one shared browser profile inside `Data`.
+Extract the complete V2 release archive to a writable folder on a Windows 11 x64 PC, then run `MonkeyTV.exe`. Keep the EXE and `Data` folder together. The archive includes Monkey TV's separately installed, app-owned Fixed Version WebView2 Runtime Pack required by experimental VPN Location V2. The app creates its portable configuration, icons, cache, and one shared browser profile inside `Data`.
 
-The Microsoft Edge WebView2 Evergreen Runtime must be installed. It is normally present on Windows 11. Streaming-service login and DRM/playback must be tested by the user with their own accounts; no provider has been certified by this project.
+Streaming-service login and DRM/playback must be tested by the user with their own accounts; no provider has been certified by this project.
 
 ## What works in this alpha
 
@@ -29,6 +29,7 @@ The Microsoft Edge WebView2 Evergreen Runtime must be installed. It is normally 
 - On-demand WebView2 creation; no service preloading
 - One reusable WebView2 and one shared portable browser profile for every configured service
 - Optional browser-only Current Location selector: Direct at every startup, or user-selected documented NordVPN SOCKS5 presets using protected Nord service credentials (not a device-wide VPN)
+- Opt-in experimental VPN Location V2: Settings can download all official UDP configurations for United States, Canada, or United Kingdom from Nord's documented all-server archive into portable `Data/VpnV2/Configs`; downloaded locations then appear in the Home Current Location picker. V1 remains the default.
 - Local Choose / Manage Services library using bundled artwork only, plus optional Home sorting and Custom drag ordering
 - Same-service Home resume; different services reuse the same WebView and navigate it to the new destination
 - Local-artwork launch transition hides the previous website until a different service finishes its initial navigation
@@ -47,7 +48,7 @@ Development, architecture, limitations, and test details are in [`docs`](docs/AR
 
 ## Development quick start
 
-Requirements: Windows 11 x64, .NET 8 SDK or newer, internet access for NuGet restore, and the WebView2 Evergreen Runtime.
+Requirements: Windows 11 x64, .NET 8 SDK or newer, and internet access for NuGet restore. V2 development additionally needs the separately obtained Microsoft Fixed Version WebView2 Runtime Pack described in the build documentation.
 
 ```powershell
 dotnet restore .\MonkeyTV\MonkeyTV.csproj

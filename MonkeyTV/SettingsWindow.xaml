@@ -8,6 +8,7 @@
       <Button Content="Home" Tag="Home" HorizontalContentAlignment="Left" Click="Nav_Click" Margin="0,0,0,7"/>
       <Button Content="Appearance" Tag="Appearance" HorizontalContentAlignment="Left" Click="Nav_Click" Margin="0,0,0,7"/>
       <Button Content="Streaming" Tag="Streaming" HorizontalContentAlignment="Left" Click="Nav_Click" Margin="0,0,0,7"/>
+      <Button x:Name="ExperimentsNavButton" Content="Experiments" Tag="Experiments" HorizontalContentAlignment="Left" Click="Nav_Click" Margin="0,0,0,7"/>
       <Button Content="Storage" Tag="Storage" HorizontalContentAlignment="Left" Click="Nav_Click" Margin="0,0,0,7"/>
       <Button Content="About Monkey TV" Tag="About" HorizontalContentAlignment="Left" Click="Nav_Click"/>
       <TextBlock Text="Keyboard" FontWeight="SemiBold" Margin="12,34,0,8"/>
@@ -62,6 +63,47 @@
           <TextBlock x:Name="NordStatusText" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,14,0,0"/>
         </StackPanel></Border>
         <Border Background="{DynamicResource SubtleSurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,18,0,0"><TextBlock Text="Current Location is a browser-proxy route, not a device-wide VPN. QUIC is disabled while using Monkey TV's WebView; WebRTC protection is best effort and is not an absolute leak-proof boundary." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" LineHeight="20"/></Border>
+      </StackPanel></ScrollViewer>
+      <ScrollViewer x:Name="ExperimentsPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Foreground="{DynamicResource TextBrush}"><StackPanel>
+        <TextBlock Text="Experiments" FontSize="28" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+        <TextBlock Text="Optional features under active development. They remain off unless you explicitly enable them." Foreground="{DynamicResource TextBrush}" Opacity="0.72" TextWrapping="Wrap" Margin="0,7,0,24"/>
+        <Border Background="{DynamicResource AccentSubtleBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,18"><StackPanel>
+          <TextBlock Text="VPN Location V2 — Experimental" FontSize="19" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+          <TextBlock Text="This unfinished feature runs imported Nord OpenVPN configurations entirely in user space. It may disconnect, fail on streaming providers, or require Monkey TV to be restarted. Current Location v1 remains the default and is not replaced." Foreground="{DynamicResource TextBrush}" Opacity="0.76" TextWrapping="Wrap" LineHeight="20" Margin="0,8,0,14"/>
+          <CheckBox x:Name="EnableVpnV2Check" Foreground="{DynamicResource TextBrush}" Content="I understand the warning and want to enable VPN Location V2" Checked="EnableVpnV2_Changed" Unchecked="EnableVpnV2_Changed"/>
+        </StackPanel></Border>
+        <StackPanel x:Name="VpnV2Controls" Visibility="Collapsed">
+          <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,16"><StackPanel>
+            <TextBlock Text="Available Nord countries" FontSize="17" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+            <TextBlock Text="Select a country. Monkey TV downloads Nord's official all-server archive, keeps every matching UDP configuration, and removes the temporary archive. Nothing downloads automatically." Foreground="{DynamicResource TextBrush}" Opacity="0.72" TextWrapping="Wrap" Margin="0,7,0,12"/>
+            <ListBox x:Name="VpnV2CatalogList" Background="{DynamicResource SubtleSurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Foreground="{DynamicResource TextBrush}" MinHeight="92" Margin="0,0,0,12">
+              <ListBox.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource TextBrush}" Padding="10,8" TextWrapping="Wrap"/>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <Button x:Name="DownloadVpnV2ConfigButton" Style="{StaticResource AccentButton}" Content="Download all servers for selected country" Click="DownloadVpnV2Config_Click" HorizontalAlignment="Left" Margin="0,0,0,18"/>
+            <TextBlock Text="Downloaded locations" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" Margin="0,0,0,8"/>
+            <ListBox x:Name="VpnV2ConfigList" Background="{DynamicResource SubtleSurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Foreground="{DynamicResource TextBrush}" MinHeight="56" Margin="0,0,0,12">
+              <ListBox.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource TextBrush}" Padding="10,8" TextWrapping="Wrap"/>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <StackPanel Orientation="Horizontal"><Button Content="Import official .ovpn manually…" Click="ImportVpnV2Config_Click" Margin="0,0,8,0"/><Button Content="Remove selected" Click="RemoveVpnV2Config_Click"/></StackPanel>
+            <TextBlock x:Name="VpnV2ConfigStatus" Foreground="{DynamicResource TextBrush}" Opacity="0.78" TextWrapping="Wrap" Margin="0,10,0,0"/>
+          </StackPanel></Border>
+          <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="14" Padding="18"><StackPanel>
+            <TextBlock Text="Nord service credentials for V2" FontSize="17" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+            <TextBlock Text="Stored separately from v1 using Windows DPAPI for this Windows user. Credentials are never included in backups or logs." Foreground="{DynamicResource TextBrush}" Opacity="0.72" TextWrapping="Wrap" Margin="0,7,0,14"/>
+            <TextBlock Text="Service username"/><TextBox x:Name="VpnV2UsernameBox" Margin="0,7,0,12"/>
+            <TextBlock Text="Service password"/><PasswordBox x:Name="VpnV2PasswordBox" Margin="0,7,0,14"/>
+            <StackPanel Orientation="Horizontal"><Button Style="{StaticResource AccentButton}" Content="Save V2 credentials" Click="SaveVpnV2Credentials_Click" Margin="0,0,8,0"/><Button Content="Clear V2 credentials" Click="ClearVpnV2Credentials_Click"/></StackPanel>
+            <TextBlock x:Name="VpnV2CredentialStatus" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,10,0,0"/>
+          </StackPanel></Border>
+        </StackPanel>
       </StackPanel></ScrollViewer>
       <ScrollViewer x:Name="StoragePage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto"><StackPanel>
         <TextBlock Text="Storage" FontSize="28" FontWeight="SemiBold"/><TextBlock Text="Storage is measured only when this page opens or you refresh it. Temporary browser cache is kept separate from sign-in and site data." Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,7,0,22"/>

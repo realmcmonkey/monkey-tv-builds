@@ -5,7 +5,8 @@
 - Windows 11 x64 development machine
 - .NET 8 SDK or newer
 - NuGet access for `Microsoft.Web.WebView2` 1.0.3537.50
-- Microsoft Edge WebView2 Evergreen Runtime for running/testing
+- Microsoft Edge WebView2 Evergreen Runtime for ordinary direct/V1 development and testing
+- For V2: a Microsoft Fixed Version WebView2 Runtime Pack at `Runtime/WebView2Fixed` and the tracked V2 helper files at `Runtime/VpnV2`
 
 No Windows-specific Visual Studio workload is required for command-line builds. Paths in the project are relative, so the source directory can be moved between PCs.
 
@@ -22,7 +23,7 @@ dotnet build .\MonkeyTV\MonkeyTV.csproj -c Release --no-restore
 dotnet publish .\MonkeyTV\MonkeyTV.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o .\artifacts\publish
 ```
 
-The project enables compressed single-file publishing and embeds managed/native app dependencies into `MonkeyTV.exe`. At runtime .NET may extract internal native support files into its operating-system-managed temporary extraction cache; these are not loose distribution files. The WebView2 Evergreen Runtime is not bundled and remains an external prerequisite.
+The project enables compressed single-file publishing and embeds managed/native app dependencies into `MonkeyTV.exe`. At runtime .NET may extract internal native support files into its operating-system-managed temporary extraction cache; these are not loose distribution files. The V2 release archive additionally contains the complete app-owned Fixed Version WebView2 Runtime beneath `Data/Requirements/WebView2Fixed` and the V2 helper beneath `Data/Requirements/VpnV2`.
 
 ## Size trade-off
 
@@ -38,6 +39,9 @@ Expected user-facing layout:
 Monkey TV/
   MonkeyTV.exe
   Data/
+    Requirements/
+      WebView2Fixed/
+      VpnV2/
 ```
 
 Documentation files may accompany the alpha without affecting runtime portability.

@@ -7,7 +7,7 @@ namespace MonkeyTV;
 
 public partial class App : Application
 {
-    private const string FallbackVersion = "0.04-alpha";
+    private const string FallbackVersion = "0.05-alpha";
     private static readonly TimeSpan MinimumSplashDuration = TimeSpan.FromSeconds(3);
     internal static long LastStartupMilliseconds { get; private set; }
 
@@ -37,6 +37,7 @@ public partial class App : Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        if (await VpnV2WfpBroker.TryRunBrokerAsync(e.Args)) { Shutdown(); return; }
         var startup = Stopwatch.StartNew();
         SplashWindow? splash = null;
         try
@@ -57,6 +58,7 @@ public partial class App : Application
             StorageService.ClearAllTemporaryData();
             var store = new SettingsStore();
             var settings = store.Load();
+            VpnV2Diagnostics.Write("experiment", $"enabled={settings.VpnLocationV2ExperimentEnabled}; diagnostics initialized");
             ThemeService.Initialize(settings);
 
             if (store.LastLoadOutcome == SettingsLoadOutcome.Unrecoverable)

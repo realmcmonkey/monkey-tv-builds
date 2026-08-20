@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     private readonly SettingsStore _store;
     private WebView2? _webView;
     private CoreWebView2Environment? _browserEnvironment;
+    private WebViewRuntimeSelection? _browserRuntime;
     private PopupWebViewWindow? _popupWindow;
     private readonly DispatcherTimer _clockTimer;
     private readonly DispatcherTimer _serviceUiTimer;
@@ -104,7 +105,8 @@ public partial class MainWindow : Window
     private void RenderHome()
     {
         ClockText.Visibility = _settings.ShowClock ? Visibility.Visible : Visibility.Collapsed;
-        CurrentLocationButton.Visibility = _settings.CurrentLocationEnabled ? Visibility.Visible : Visibility.Collapsed;
+        CurrentLocationButton.Visibility = (_settings.CurrentLocationEnabled ||
+            (_settings.VpnLocationV2ExperimentEnabled && WebViewRuntimeResolver.IsVpnV2DependencyPackInstalled)) ? Visibility.Visible : Visibility.Collapsed;
         var services = GetHomeServices();
         ServicesPanel.Children.Clear();
         ServicesPanel.AllowDrop = _settings.ServiceSorting == ServiceSorting.Custom;
@@ -547,7 +549,15 @@ public partial class MainWindow : Window
                 // Narrow Feature #0.01 exception: one fixed loopback routing boundary.
                 AdditionalBrowserArguments = $"--proxy-server=http://127.0.0.1:{proxyPort} --disable-quic --force-webrtc-ip-handling-policy=disable_non_proxied_udp"
             };
-            var environment = await CoreWebView2Environment.CreateAsync(null, PortablePaths.SharedBrowserUserDataDirectory, options);
+            // Fixed Version is preferred when the separately installed runtime pack
+            // is present. Evergreen remains the v1/SOCKS fallback only; v2 must
+            // require a Fixed runtime before it installs any WFP/VPN state.
+            _browserRuntime = WebViewRuntimeResolver.Select();
+            if (_browserRuntime.IsFixed)
+                AppLog.Write("browser", $"Using Fixed Version WebView2 {_browserRuntime.Version}.");
+            else
+                AppLog.Write("browser", "Using Evergreen WebView2. Current Location v2 is unavailable: " + _browserRuntime.Detail);
+            var environment = await CoreWebView2Environment.CreateAsync(_browserRuntime.IsFixed ? _browserRuntime.BrowserExecutableFolder : null, PortablePaths.SharedBrowserUserDataDirectory, options);
             _browserEnvironment = environment;
             if (generation != _browserGeneration) return;
 
@@ -1133,7 +1143,8 @@ public partial class MainWindow : Window
     private void UpdateCurrentLocationControl()
     {
         CurrentLocationText.Text = _locationRouter.DisplayName;
-        CurrentLocationButton.Visibility = _settings.CurrentLocationEnabled ? Visibility.Visible : Visibility.Collapsed;
+        CurrentLocationButton.Visibility = (_settings.CurrentLocationEnabled ||
+            (_settings.VpnLocationV2ExperimentEnabled && WebViewRuntimeResolver.IsVpnV2DependencyPackInstalled)) ? Visibility.Visible : Visibility.Collapsed;
         CurrentLocationButton.IsEnabled = _locationRouter.State != CurrentLocationState.Connecting;
         CurrentLocationButton.ToolTip = _locationRouter.State == CurrentLocationState.Failed
             ? "Current Location failed — choose Retry or Direct"
@@ -1142,10 +1153,124 @@ public partial class MainWindow : Window
 
     private void CurrentLocation_Click(object sender, RoutedEventArgs e)
     {
-        var lastUsed = _settings.LastUsedNordLocation is { } last ? NordLocationCatalog.Get(last) : null;
-        var picker = new CurrentLocationPickerWindow(lastUsed) { Owner = this };
+        // Older builds could persist a Netherlands or Sweden preset. Those endpoints remain
+        // readable for settings compatibility, but must not reappear in the redesigned picker.
+        var lastUsed = _settings.LastUsedNordLocation is { } last ? NordLocationCatalog.TryGet(last) : null;
+        if (lastUsed is not null && !NordLocationCatalog.IsPickerLocation(lastUsed)) lastUsed = null;
+        var v2Locations = _settings.VpnLocationV2ExperimentEnabled && WebViewRuntimeResolver.IsVpnV2DependencyPackInstalled
+            ? VpnV2ConfigStore.Load() : [];
+        var picker = new CurrentLocationPickerWindow(lastUsed, v2Locations) { Owner = this };
         if (picker.ShowDialog() != true) return;
-        _ = ChangeLocationAsync(picker.SelectDirect ? null : picker.SelectedLocation);
+        if (picker.SelectedV2Location is { } v2) _ = ChangeVpnV2LocationAsync(v2);
+        else _ = ChangeLocationAsync(picker.SelectDirect ? null : picker.SelectedLocation);
+    }
+    private async Task ChangeVpnV2LocationAsync(VpnV2ImportedConfig config)
+    {
+        if (!_settings.VpnLocationV2ExperimentEnabled) { VpnV2Diagnostics.Write("vpn-v2", "selection ignored because experiment is disabled"); return; }
+        VpnV2Diagnostics.Write("vpn-v2", $"location selected={config.Country}/{config.ServerName} managed-config={VpnV2Diagnostics.ManagedConfigPath(config)} exists={File.Exists(config.FullPath)}");
+        if (!WebViewRuntimeResolver.TryRequireFixedForCurrentLocationV2(out var fixedRuntime, out var runtimeMessage) ||
+            string.IsNullOrWhiteSpace(fixedRuntime.BrowserExecutableFolder))
+        {
+            VpnV2Diagnostics.Write("fixed-runtime", "unavailable: " + runtimeMessage);
+            new ConfirmWindow("VPN Location V2 is unavailable", runtimeMessage, "OK") { Owner = this }.ShowDialog();
+            return;
+        }
+        VpnV2Diagnostics.Dependency("Fixed WebView2 runtime", Path.Combine(fixedRuntime.BrowserExecutableFolder, WebViewRuntimeResolver.FixedRuntimeExecutableName));
+        VpnV2Diagnostics.Write("fixed-runtime", $"validated version={fixedRuntime.Version}");
+        if (_webView?.CoreWebView2 is not null && _browserRuntime?.IsFixed != true)
+        {
+            new ConfirmWindow("Restart required for VPN Location V2", "The current browser was created with shared Evergreen WebView2. Restart Monkey TV so its validated Fixed Runtime can be used before enabling containment.", "OK") { Owner = this }.ShowDialog();
+            return;
+        }
+        var credentials = VpnV2CredentialStore.Load();
+        VpnV2Diagnostics.Write("credential-retrieval", $"DPAPI credentials available={credentials is not null}");
+        if (credentials is null)
+        {
+            var setup = new SettingsWindow(_settings, _store, "Experiments") { Owner = this };
+            setup.ShowDialog(); credentials = VpnV2CredentialStore.Load(); if (credentials is null) return;
+        }
+        var service = ActiveService;
+        var wasBrowsing = service is not null && BrowserView.Visibility == Visibility.Visible;
+        if (wasBrowsing) BeginServiceLaunch(service!);
+        _locationRouter.Block();
+        var countryConfigs = VpnV2ConfigStore.Load().Where(item => item.Country.Equals(config.Country, StringComparison.OrdinalIgnoreCase)).ToList();
+        var candidates = new[] { config }
+            .Concat(countryConfigs.Where(item => item.Id != config.Id).OrderBy(_ => Random.Shared.Next()))
+            .Take(5).ToList();
+        VpnV2Diagnostics.Write("vpn-v2", $"candidate-count={candidates.Count}");
+        var connected = false;
+        var authenticatedCandidateRejectedForCountry = false;
+        var freshSessionAuthenticationRetries = 0;
+        VpnV2ImportedConfig? connectedConfig = null;
+        foreach (var candidate in candidates)
+        {
+            connected = await _locationRouter.SelectVpnV2Async(candidate, credentials,
+                Path.Combine(fixedRuntime.BrowserExecutableFolder, WebViewRuntimeResolver.FixedRuntimeExecutableName));
+            if (connected) { connectedConfig = candidate; break; }
+            if (_locationRouter.VpnV2ContainmentFailed) break;
+            if (_locationRouter.LastVpnV2Failure == VpnV2CandidateFailure.CountryMismatch)
+            {
+                authenticatedCandidateRejectedForCountry = true;
+                VpnV2Diagnostics.Write("vpn-v2", "candidate rejected: independent country checks disagreed; waiting for Nord session teardown before fallback.");
+                _locationRouter.ContinueVpnV2Fallback();
+                await Task.Delay(TimeSpan.FromSeconds(15));
+                VpnV2Diagnostics.Write("vpn-v2", "candidate fallback cooldown complete.");
+                continue;
+            }
+            if (_locationRouter.LastVpnV2Failure == VpnV2CandidateFailure.Authentication &&
+                (authenticatedCandidateRejectedForCountry || _locationRouter.HasAuthenticatedVpnV2ThisSession))
+            {
+                // Credentials were proven by a fully established tunnel in this app
+                // session. Nord can retain the prior UDP login briefly across Direct
+                // or country switching, so this rejection is not evidence that the
+                // stored credentials are invalid.
+                // Nord can briefly reject a new session while the old UDP session is
+                // being released, so keep fail-closed and continue after a cooldown.
+                VpnV2Diagnostics.Write("vpn-v2", "authentication rejected after a proven authenticated candidate; treating as transient session teardown and continuing fallback.");
+                _locationRouter.ContinueVpnV2Fallback();
+                await Task.Delay(TimeSpan.FromSeconds(15));
+                VpnV2Diagnostics.Write("vpn-v2", "transient authentication cooldown complete.");
+                continue;
+            }
+            if (_locationRouter.LastVpnV2Failure == VpnV2CandidateFailure.Authentication &&
+                freshSessionAuthenticationRetries++ == 0)
+            {
+                VpnV2Diagnostics.Write("vpn-v2", "first authentication rejection in a fresh app session; allowing one cooled-down candidate retry.");
+                _locationRouter.ContinueVpnV2Fallback();
+                await Task.Delay(TimeSpan.FromSeconds(15));
+                VpnV2Diagnostics.Write("vpn-v2", "fresh-session authentication retry cooldown complete.");
+                continue;
+            }
+            if (_locationRouter.LastVpnV2Failure is VpnV2CandidateFailure.Authentication or VpnV2CandidateFailure.Compression)
+            {
+                VpnV2Diagnostics.Write("vpn-v2", $"candidate fallback stopped: {_locationRouter.LastVpnV2Failure} applies to the current credentials or profile family.");
+                break;
+            }
+        }
+        if (!connected)
+        {
+            var detail = _locationRouter.VpnV2ContainmentFailed
+                ? "Windows could not enable the required Fixed WebView2 containment policy. The route remained blocked; approve the one-time administrator prompt and retry."
+                : $"The experimental route tried {candidates.Count} downloaded Nord configurations and failed closed. Choose another server, Direct, or retry.";
+            if (wasBrowsing) ShowServiceError(service!, "Monkey TV couldn't connect to " + config.Country + ".", detail);
+            return;
+        }
+        if (connectedConfig is not null && connectedConfig.Id != config.Id)
+            AppLog.Write("vpn-v2", $"Selected server was unavailable; connected using another downloaded {config.Country} configuration.");
+        if (wasBrowsing && _webView?.CoreWebView2 is not null)
+        {
+            BeginServiceLaunch(service!); ApplyServiceSettings(_webView, service!); _webView.CoreWebView2.Navigate(service!.Url);
+        }
+    }
+
+    internal async Task SetVpnLocationV2ExperimentEnabledAsync(bool enabled)
+    {
+        if (!enabled && _locationRouter.ActiveVpnV2Location is not null)
+            await ChangeLocationAsync(null);
+        _settings.VpnLocationV2ExperimentEnabled = enabled;
+        _store.Save(_settings);
+        VpnV2Diagnostics.Write("experiment", $"enabled={enabled}");
+        RenderHome();
     }
 
     private async Task ChangeLocationAsync(NordLocation? location)
@@ -1155,7 +1280,13 @@ public partial class MainWindow : Window
         if (location is null)
         {
             if (wasBrowsing) BeginServiceLaunch(service!);
-            _locationRouter.Block(); await _locationRouter.SelectDirectAsync();
+            _locationRouter.Block();
+            var directReady = await _locationRouter.SelectDirectAsync();
+            if (!directReady)
+            {
+                if (wasBrowsing) ShowServiceError(service!, "Monkey TV couldn't verify Direct.", "The V2 helper and containment were removed, but the intended Direct route could not be verified. Monkey TV remains blocked.");
+                return;
+            }
             if (wasBrowsing && _webView?.CoreWebView2 is not null)
             { BeginServiceLaunch(service!); ApplyServiceSettings(_webView, service!); _webView.CoreWebView2.Navigate(service!.Url); }
             return;

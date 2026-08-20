@@ -8,21 +8,61 @@ static void Require(bool condition, string message)
 }
 
 PortablePaths.EnsureCreated();
-Require(App.DisplayVersion == "0.04-alpha", "Release version metadata is incorrect.");
-Require(App.BuildNumber == "5", "Build #5 metadata is incorrect.");
-Require(App.AlphaWarningKey == "0.04-alpha-build-5", "Alpha warning is not keyed to v0.04 Build #5.");
+Require(App.DisplayVersion == "0.05-alpha", "Release version metadata is incorrect.");
+Require(App.BuildNumber == "1", "Build #1 metadata is incorrect.");
+Require(App.AlphaWarningKey == "0.05-alpha-build-1", "Alpha warning is not keyed to v0.05 Build #1.");
 Require(NordLocationCatalog.All.Count >= 3, "Nord location catalog is missing documented presets.");
+var absentRuntime = WebViewRuntimeResolver.InspectFixedRuntime(Path.Combine(PortablePaths.CacheDirectory, "missing-fixed-runtime"));
+Require(absentRuntime.Kind == WebViewRuntimeKind.FixedUnavailable && !absentRuntime.IsFixed, "A missing Fixed Version runtime was not rejected.");
+Require(!WebViewRuntimeResolver.TryRequireFixedForCurrentLocationV2(out var selectedRuntime, out var fixedRuntimeRequirement) || selectedRuntime.IsFixed, "Current Location v2 accepted an unvalidated runtime.");
+if (!selectedRuntime.IsFixed) Require(fixedRuntimeRequirement.Contains("Fixed Version", StringComparison.Ordinal), "Current Location v2 prerequisite message is unclear.");
 Require(NordLocationCatalog.Get(NordLocationId.UnitedStates).Host == "us.socks.nordhold.net", "Documented Nord US SOCKS host changed unexpectedly.");
+Require(NordLocationCatalog.PickerCountries.SequenceEqual(new[] { "United States", "Canada", "United Kingdom" }), "Current Location picker countries changed unexpectedly.");
+Require(NordLocationCatalog.ForPickerCountry("United States").Select(location => location.City ?? "Automatic").SequenceEqual(new[] { "Automatic", "Atlanta", "Chicago", "Dallas", "Los Angeles", "New York", "Phoenix", "San Francisco" }), "U.S. documented SOCKS5 locations are incomplete or not alphabetical.");
+Require(!NordLocationCatalog.ForPickerCountry("Canada").Any() && !NordLocationCatalog.ForPickerCountry("United Kingdom").Any(), "Unsupported Nord SOCKS5 countries must not be fabricated.");
 var locationSettings = new MonkeySettings { LastUsedNordLocation = NordLocationId.NewYork };
 var locationStore = new SettingsStore(); locationStore.Save(locationSettings);
 Require(locationStore.Load().LastUsedNordLocation == NordLocationId.NewYork, "Last used Nord location did not persist as a convenience setting.");
 locationSettings.CurrentLocationEnabled = true; locationStore.Save(locationSettings);
 Require(locationStore.Load().CurrentLocationEnabled, "Current Location Home visibility preference did not persist.");
+Require(!new MonkeySettings().VpnLocationV2ExperimentEnabled, "VPN Location V2 must default to disabled.");
+Require(VpnV2LocationCatalog.All.Select(item => item.Country).SequenceEqual(new[] { "United States", "Canada", "United Kingdom" }), "VPN Location V2 download catalog changed unexpectedly.");
+if (args.Contains("--vpn-v2-download-test", StringComparer.OrdinalIgnoreCase))
+{
+    var result = await VpnV2LocationCatalog.DownloadCountryAsync(VpnV2LocationCatalog.All.Single(item => item.Country == "Canada"));
+    var downloaded = VpnV2ConfigStore.Load().Where(item => item.Country == "Canada").ToList();
+    Require(result.InstalledCount > 1 && downloaded.Count == result.InstalledCount && downloaded.All(item => File.Exists(item.FullPath)),
+        "VPN Location V2 did not install all matching official Nord country configurations.");
+    foreach (var item in downloaded) VpnV2ConfigStore.Remove(item.Id);
+}
+locationSettings.VpnLocationV2ExperimentEnabled = true; locationStore.Save(locationSettings);
+Require(locationStore.Load().VpnLocationV2ExperimentEnabled, "VPN Location V2 opt-in did not persist.");
+var v2ImportRoot = Path.Combine(Path.GetTempPath(), "MonkeyTV-v2-config-test-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(v2ImportRoot);
+var v2ImportPath = Path.Combine(v2ImportRoot, "ca1968.nordvpn.com.udp_2.6.ovpn");
+File.WriteAllText(v2ImportPath, """
+client
+dev tun
+proto udp
+remote 187.13.240.179 53
+remote-cert-tls server
+auth-user-pass
+<ca>
+test-public-ca
+</ca>
+<tls-auth>
+test-public-tls-auth
+</tls-auth>
+""");
+var importedV2 = VpnV2ConfigStore.Import(v2ImportPath);
+Require(importedV2.Country == "Canada" && importedV2.ServerName == "ca1968.nordvpn.com" && File.Exists(importedV2.FullPath), "The proven V2 config was not imported safely.");
+VpnV2ConfigStore.Remove(importedV2.Id);
+Directory.Delete(v2ImportRoot, true);
 await using (var directRouter = new CurrentLocationRouter())
 {
     Require(directRouter.State == CurrentLocationState.Direct && directRouter.ActiveLocation is null, "Current Location does not begin Direct.");
     Require(directRouter.EnsureGateway() > 0, "Loopback gateway did not receive a local port.");
-    await directRouter.SelectDirectAsync();
+    Require(await directRouter.SelectDirectAsync(), "Direct route verification failed.");
     Require(directRouter.State == CurrentLocationState.Direct, "Direct selection did not restore Direct state.");
 }
 Require(BuiltInArtworkCatalog.All.Count == 46, "The built-in artwork catalog is incomplete.");

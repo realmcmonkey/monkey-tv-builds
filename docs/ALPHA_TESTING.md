@@ -4,7 +4,7 @@ Test with a copy of the package and non-critical accounts. Back up `Data` before
 
 ## Shell and setup
 
-- [ ] Launch immediately shows the Monkey TV splash, then `Monkey TV v0.04-alpha`; the splash disappears as soon as Home is ready.
+- [ ] Launch immediately shows the Monkey TV splash, then `Monkey TV v0.05-alpha`; the splash disappears as soon as Home is ready.
 - [ ] Startup creates no service WebView and makes no provider request before a service is clicked.
 - [ ] Startup shows `Current Location: Direct`; no NordVPN connection or location traffic occurs automatically. A prior Nord location appears only as an inactive `Last used` choice.
 - [ ] Fresh setup offers optional Current Location. Set up saves Nord **service** credentials and enables the Home control without connecting; Skip completes setup, remains Direct, and hides the control.

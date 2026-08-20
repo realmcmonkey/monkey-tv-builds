@@ -110,7 +110,12 @@ internal sealed class LoopbackProxy : IAsyncDisposable
             {
                 _attempts.Enqueue(new ProxyAttempt(target, true, true, addresses, null));
                 await stream.WriteAsync("HTTP/1.1 200 Connection Established\r\n\r\n"u8.ToArray(), cancellationToken);
-                await Task.WhenAny(stream.CopyToAsync(upstreamStream, cancellationToken), upstreamStream.CopyToAsync(stream, cancellationToken));
+                // A CONNECT tunnel is full duplex. Disposing both sockets when the first
+                // copy happens to complete can truncate the TLS response and produces a
+                // misleading WebView2 NavigationCompleted/Unknown result.
+                await Task.WhenAll(
+                    stream.CopyToAsync(upstreamStream, cancellationToken),
+                    upstreamStream.CopyToAsync(stream, cancellationToken));
             }
         }
         catch (IOException) { }

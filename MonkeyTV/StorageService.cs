@@ -148,7 +148,21 @@ public static class StorageService
 
     public static void ResetMonkeyTvData()
     {
-        if (Directory.Exists(PortablePaths.DataRoot)) Directory.Delete(PortablePaths.DataRoot, true);
+        if (Directory.Exists(PortablePaths.DataRoot))
+        {
+            var preserveRequirements = string.Equals(
+                Path.GetFullPath(PortablePaths.DataRoot).TrimEnd(Path.DirectorySeparatorChar),
+                Path.GetFullPath(PortablePaths.DefaultDataRoot).TrimEnd(Path.DirectorySeparatorChar),
+                StringComparison.OrdinalIgnoreCase);
+            if (preserveRequirements)
+            {
+                foreach (var file in Directory.EnumerateFiles(PortablePaths.DataRoot)) File.Delete(file);
+                foreach (var directory in Directory.EnumerateDirectories(PortablePaths.DataRoot))
+                    if (!string.Equals(Path.GetFileName(directory), "Requirements", StringComparison.OrdinalIgnoreCase))
+                        Directory.Delete(directory, true);
+            }
+            else Directory.Delete(PortablePaths.DataRoot, true);
+        }
         PortablePaths.EnsureCreated();
     }
 

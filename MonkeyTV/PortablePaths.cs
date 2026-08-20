@@ -4,6 +4,11 @@ public static class PortablePaths
 {
     public static string AppRoot => AppContext.BaseDirectory;
     public static string DefaultDataRoot => Path.Combine(AppRoot, "Data");
+    // Installed dependencies stay beside MonkeyTV.exe even when the user moves
+    // their writable data root. They are not settings, browser data, or backups.
+    public static string RequirementsDirectory => Path.Combine(DefaultDataRoot, "Requirements");
+    public static string FixedWebView2RuntimeDirectory => Path.Combine(RequirementsDirectory, "WebView2Fixed");
+    public static string VpnV2RequirementsDirectory => Path.Combine(RequirementsDirectory, "VpnV2");
     private static string _dataRoot = DefaultDataRoot;
     private static string DataLocationPointerFile => Path.Combine(DefaultDataRoot, "Settings", "data-location.json");
     public static string DataRoot => _dataRoot;
@@ -20,6 +25,9 @@ public static class PortablePaths
     public static string PendingSharedProfileDeletesFile => Path.Combine(SettingsDirectory, "pending-shared-profile-deletes.json");
     public static string RecoveryDirectory => Path.Combine(DataRoot, "Recovery");
     public static string StartupStateFile => Path.Combine(SettingsDirectory, "startup-state.json");
+    public static string VpnV2Directory => Path.Combine(DataRoot, "VpnV2");
+    public static string VpnV2ConfigDirectory => Path.Combine(VpnV2Directory, "Configs");
+    public static string VpnV2IndexFile => Path.Combine(VpnV2Directory, "locations.json");
 
     public static void EnsureCreated()
     {
@@ -31,6 +39,8 @@ public static class PortablePaths
         Directory.CreateDirectory(CacheDirectory);
         Directory.CreateDirectory(LogsDirectory);
         Directory.CreateDirectory(RecoveryDirectory);
+        Directory.CreateDirectory(VpnV2ConfigDirectory);
+        Directory.CreateDirectory(RequirementsDirectory);
     }
 
     public static void InitializeDataRoot()
@@ -82,14 +92,24 @@ public static class PortablePaths
     {
         if (!Directory.Exists(source)) return;
         foreach (var directory in Directory.EnumerateDirectories(source, "*", SearchOption.AllDirectories))
-            Directory.CreateDirectory(Path.Combine(destination, Path.GetRelativePath(source, directory)));
+        {
+            var relative = Path.GetRelativePath(source, directory);
+            if (IsRequirementsPath(relative)) continue;
+            Directory.CreateDirectory(Path.Combine(destination, relative));
+        }
         foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
         {
             if (string.Equals(Path.GetFullPath(file), Path.GetFullPath(DataLocationPointerFile), StringComparison.OrdinalIgnoreCase)) continue;
-            var target = Path.Combine(destination, Path.GetRelativePath(source, file));
+            var relative = Path.GetRelativePath(source, file);
+            if (IsRequirementsPath(relative)) continue;
+            var target = Path.Combine(destination, relative);
             Directory.CreateDirectory(Path.GetDirectoryName(target)!); File.Copy(file, target, true);
         }
     }
+
+    private static bool IsRequirementsPath(string relative) =>
+        relative.Equals("Requirements", StringComparison.OrdinalIgnoreCase) ||
+        relative.StartsWith("Requirements" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
 
     private sealed record DataLocationPointer(string Path, string MachineName);
 

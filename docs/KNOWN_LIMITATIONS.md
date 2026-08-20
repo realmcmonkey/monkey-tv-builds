@@ -1,9 +1,10 @@
-# Known limitations — v0.04-alpha
+# Known limitations — v0.05-alpha
 
 - Built-in artwork matching is conservative and based on configured service name/domain. Unusual names or URLs may require manual selection from the artwork picker.
 
 - Streaming providers, logins, audio/video, subtitles, DRM, and provider fullscreen have not been account-tested. Provider policy may block embedded browsers even when Edge itself works. No bypass will be attempted.
-- The build relies on the WebView2 Evergreen Runtime installed on Windows.
+- The complete V2 release archive uses a separately packaged Microsoft Fixed Version WebView2 Runtime for its app-only process identity. It is large by design and must be updated in future releases; do not remove individual runtime files.
+- VPN Location V2 is an opt-in experiment. It can download official Nord UDP configurations for USA, Canada, and United Kingdom; provider login, DRM, streaming playback, sustained parallel WebView traffic, tunnel recovery, and long-duration packet-level containment still require hands-on testing. Current Location v1 remains the default.
 - Browser controls use a small auto-hiding owned flyout because same-window WPF content cannot safely overlay the standard WebView2 HWND. The composition alternative remains unsuitable because DRM-protected content can fail.
 - Automatic icons are best effort. Some sites block requests, omit icon metadata, return unsupported formats, or require JavaScript; manual replacement is available.
 - Automatic banner discovery is best effort and currently uses suitable Open Graph/Twitter landscape images exposed in initial HTML. Sites may provide marketing/content art instead of a clean logo, omit metadata, require JavaScript, or block the request; manual banner replacement is available.

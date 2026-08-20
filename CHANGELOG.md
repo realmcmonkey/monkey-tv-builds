@@ -2,6 +2,23 @@
 
 This is the detailed official release history. GitHub release pages contain a short summary and link here. Features described as requiring manual testing were not claimed as provider-verified.
 
+## v0.05-alpha — Build #1
+
+- Optimized the local V2 test distributable without pruning any Microsoft Fixed Runtime component: native helper inputs now come from a stable runtime dependency folder, Release debug payload is disabled, and clean publishes exclude profiles, logs, credentials, downloaded configurations, and build/test intermediates.
+- Added executable-grade compression for the extracted local test copy and a maximum-compression archive for local storage and transfer while preserving Current Location v1, V2 USA/Canada/UK, DRM components, fixed-runtime identity, and portable data behavior.
+- Added an explicitly opt-in **Settings → Experiments → VPN Location V2** lane without changing Current Location v1 or enabling any route automatically.
+- VPN Location V2 now presents United States/Canada/United Kingdom, downloads every matching official UDP configuration from Nord's documented all-server archive into portable `Data/VpnV2/Configs`, and shows those locations in Current Location on Home whenever the experiment is enabled.
+- Corrected unreadable Experiments text in light themes by using the live Monkey TV foreground resources explicitly.
+- V2 test builds now keep their app-owned, Microsoft-signed Fixed WebView2 Runtime Pack and native VPN helper beneath `Data/Requirements`; packaged V2 no longer searches a source checkout or developer folders for those dependencies. Requirements remain beside `MonkeyTV.exe`, are excluded from user-data relocation/backup, and survive Reset Monkey TV. Added bounded, sanitized `Data/Logs/vpn-v2.log` lifecycle diagnostics for helper startup, configuration evaluation, authentication/tunnel stages, DNS, and route-gateway failures.
+- Strengthened experimental V2 readiness with three tunnel-contained country checks using a strict independent majority, removed high-volume per-packet diagnostic spam, and added cooled-down candidate fallback for Nord session teardown during Direct/country switching.
+- Experimental V2 connection now fails over across up to five downloaded configurations from the selected country before reporting a fail-closed connection error.
+- Integrated the proven Fixed WebView2 application-ID WFP containment rules into V2 through a minimal elevated, session-scoped broker. One UAC approval enables reusable containment for the app session; Direct disables it and performs a real direct TCP verification before reporting Direct.
+- Added strict import of the one official Nord Canada OpenVPN profile proven during development (`ca1968.nordvpn.com`, UDP). No country, city, or endpoint is inferred.
+- Integrated a separate native OpenVPN 3 Core + lwIP helper. Browser CONNECT destinations and DNS remain inside its user-space packet path; Windows sees the loopback proxy and the outer Nord transport, not website destination sockets.
+- Added separate DPAPI-protected V2 credentials, fail-closed helper lifecycle, IPv4-only destination handling, and automatic return to Deny if the helper exits.
+- No Windows VPN profile, route, adapter, driver, service, policy, or elevation is used by V2.
+- This work is local and experimental. Provider logins, DRM, playback, popup flows, sustained parallel traffic, tunnel recovery, and WebRTC packet containment still require hands-on testing before release.
+
 ## v0.04-alpha — Build #5
 
 ### Manage Services and YouTube

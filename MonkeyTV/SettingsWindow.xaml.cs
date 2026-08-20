@@ -32,13 +32,22 @@ public partial class SettingsWindow : Window
         AboutVersionText.Text = $"Version v{App.DisplayVersion} — Build #{App.BuildNumber}";
         NordStatusText.Text = NordCredentialStore.HasCredentials ? "NordVPN service credentials are saved securely." : "No NordVPN service credentials are saved.";
         ShowCurrentLocationCheck.IsChecked = _settings.CurrentLocationEnabled;
+        var vpnV2Available = WebViewRuntimeResolver.IsVpnV2DependencyPackInstalled;
+        ExperimentsNavButton.Visibility = vpnV2Available ? Visibility.Visible : Visibility.Collapsed;
+        EnableVpnV2Check.IsChecked = vpnV2Available && _settings.VpnLocationV2ExperimentEnabled;
+        VpnV2Controls.Visibility = _settings.VpnLocationV2ExperimentEnabled ? Visibility.Visible : Visibility.Collapsed;
+        VpnV2CredentialStatus.Text = VpnV2CredentialStore.HasCredentials ? "V2 credentials are saved securely." : "No V2 credentials are saved.";
+        VpnV2CatalogList.ItemsSource = VpnV2LocationCatalog.All;
+        VpnV2CatalogList.SelectedIndex = 0;
+        RefreshVpnV2Configs();
         RefreshList(); RefreshAbout(); _appearanceReady = true;
         if (initialPage == "VPN") ShowPage(VpnPage);
+        if (initialPage == "Experiments" && vpnV2Available) ShowPage(ExperimentsPage);
     }
 
     private void ShowPage(FrameworkElement page)
     {
-        foreach (var candidate in new FrameworkElement[] { ServicesPage, HomePage, AppearancePage, VpnPage, StoragePage, BackupPage, AboutPage }) candidate.Visibility = Visibility.Collapsed;
+        foreach (var candidate in new FrameworkElement[] { ServicesPage, HomePage, AppearancePage, VpnPage, ExperimentsPage, StoragePage, BackupPage, AboutPage }) candidate.Visibility = Visibility.Collapsed;
         page.Visibility = Visibility.Visible;
         if (ReferenceEquals(page, StoragePage)) RefreshStorage();
         if (ReferenceEquals(page, AboutPage)) RefreshAbout();
@@ -47,7 +56,76 @@ public partial class SettingsWindow : Window
     private void Nav_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string tag }) return;
-        ShowPage(tag switch { "Home" => HomePage, "Appearance" => AppearancePage, "Streaming" or "VPN" => VpnPage, "Storage" => StoragePage, "About" => AboutPage, _ => ServicesPage });
+        ShowPage(tag switch { "Home" => HomePage, "Appearance" => AppearancePage, "Streaming" or "VPN" => VpnPage, "Experiments" => ExperimentsPage, "Storage" => StoragePage, "About" => AboutPage, _ => ServicesPage });
+    }
+
+    private void RefreshVpnV2Configs()
+    {
+        VpnV2ConfigList.ItemsSource = null;
+        VpnV2ConfigList.ItemsSource = VpnV2ConfigStore.Load();
+    }
+
+    private async void EnableVpnV2_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!IsLoaded) return;
+        var enabled = EnableVpnV2Check.IsChecked == true;
+        if (enabled)
+        {
+            var confirmation = new ConfirmWindow("Enable experimental VPN Location V2?", "VPN Location V2 is unfinished and has not yet been manually validated with every streaming provider. It uses only configurations you import and remains separate from Current Location v1.", "Enable experiment") { Owner = this };
+            if (confirmation.ShowDialog() != true) { EnableVpnV2Check.IsChecked = false; return; }
+        }
+        if (Owner is MainWindow main) await main.SetVpnLocationV2ExperimentEnabledAsync(enabled);
+        else { _settings.VpnLocationV2ExperimentEnabled = enabled; _store.Save(_settings); }
+        VpnV2Controls.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void ImportVpnV2Config_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog { Filter = "Nord OpenVPN configuration|*.ovpn", Title = "Import official Nord Canada configuration" };
+        if (dialog.ShowDialog(this) != true) return;
+        try { var imported = VpnV2ConfigStore.Import(dialog.FileName); RefreshVpnV2Configs(); VpnV2ConfigStatus.Text = "Imported " + imported.DisplayName + "."; }
+        catch (Exception ex) { VpnV2ConfigStatus.Text = ex.Message; }
+    }
+
+    private async void DownloadVpnV2Config_Click(object sender, RoutedEventArgs e)
+    {
+        if (VpnV2CatalogList.SelectedItem is not VpnV2CountryDownload selected)
+        {
+            VpnV2ConfigStatus.Text = "Choose a location to download.";
+            return;
+        }
+        DownloadVpnV2ConfigButton.IsEnabled = false;
+        VpnV2ConfigStatus.Text = "Preparing " + selected.Country + "…";
+        try
+        {
+            var progress = new Progress<string>(message => VpnV2ConfigStatus.Text = message);
+            var result = await VpnV2LocationCatalog.DownloadCountryAsync(selected, progress);
+            RefreshVpnV2Configs();
+            VpnV2ConfigStatus.Text = $"{result.InstalledCount} {result.Country} server configurations are ready in {PortablePaths.VpnV2ConfigDirectory}.";
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("vpn-v2", "Official configuration download failed: " + ex.Message);
+            VpnV2ConfigStatus.Text = "Download failed safely: " + ex.Message;
+        }
+        finally { DownloadVpnV2ConfigButton.IsEnabled = true; }
+    }
+
+    private void RemoveVpnV2Config_Click(object sender, RoutedEventArgs e)
+    {
+        if (VpnV2ConfigList.SelectedItem is not VpnV2ImportedConfig selected) return;
+        VpnV2ConfigStore.Remove(selected.Id); RefreshVpnV2Configs(); VpnV2ConfigStatus.Text = "Imported configuration removed.";
+    }
+
+    private void SaveVpnV2Credentials_Click(object sender, RoutedEventArgs e)
+    {
+        try { VpnV2CredentialStore.Save(VpnV2UsernameBox.Text, VpnV2PasswordBox.Password); VpnV2PasswordBox.Clear(); VpnV2CredentialStatus.Text = "V2 credentials saved securely for this Windows user."; }
+        catch (Exception ex) { VpnV2CredentialStatus.Text = "Could not save V2 credentials: " + ex.Message; }
+    }
+
+    private void ClearVpnV2Credentials_Click(object sender, RoutedEventArgs e)
+    {
+        VpnV2CredentialStore.Clear(); VpnV2UsernameBox.Clear(); VpnV2PasswordBox.Clear(); VpnV2CredentialStatus.Text = "V2 credentials cleared.";
     }
 
     private void RefreshList(int selected = -1)

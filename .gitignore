@@ -4,6 +4,10 @@
 artifacts/
 builds/
 
+# Microsoft Fixed WebView2 Runtime is a release dependency, distributed with
+# the local prerelease archive rather than committed as 600+ MiB of binaries.
+Runtime/WebView2Fixed/
+
 # Portable runtime data: may contain streaming profiles, cookies, DRM state, logs, and caches.
 Data/
 MonkeyTV/Data/

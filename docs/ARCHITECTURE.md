@@ -1,5 +1,15 @@
 # Architecture
 
+## Current Location v2 experimental lane
+
+The released Current Location route remains the loopback-only SOCKS5 gateway.
+The local V2 experiment reuses that stable browser boundary and delegates a
+selected route to a loopback-only native helper. The helper combines OpenVPN 3
+Core with lwIP, so destination DNS/TCP packets are created in user space and fed
+directly into the encrypted OpenVPN session. It does not install or configure
+Windows networking. V2 is disabled by default and its helper is not started
+until the user imports and selects the proven Canada profile.
+
 Monkey TV v0.0.3-alpha uses .NET 8 WPF for the shell and Microsoft Edge WebView2 for websites. This gives a native Windows desktop lifecycle, a modern custom shell, the browser engine already supported on Windows 11, persistent cookies, and access to the runtime's legitimate media capabilities.
 
 ## Main components

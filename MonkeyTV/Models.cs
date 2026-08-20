@@ -76,6 +76,7 @@ public sealed class MonkeySettings
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public ServiceSorting ServiceSorting { get; set; } = ServiceSorting.Custom;
     public bool CurrentLocationEnabled { get; set; }
+    public bool VpnLocationV2ExperimentEnabled { get; set; }
     // This is a convenience only. Startup always begins on Direct and never reconnects it.
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public NordLocationId? LastUsedNordLocation { get; set; }
