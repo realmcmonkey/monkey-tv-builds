@@ -17,6 +17,20 @@ public enum ExternalLinkBehavior { DefaultBrowser, AskFirst }
 public enum ServiceSorting { Custom, AlphabeticalAscending, AlphabeticalDescending, RecentlyAddedNewest, RecentlyAddedOldest }
 public enum CurrentLocationState { Direct, Connecting, Connected, Failed }
 public enum NordLocationId { UnitedStates, Netherlands, Sweden, Atlanta, Chicago, Dallas, LosAngeles, NewYork, Phoenix, SanFrancisco, Stockholm, Amsterdam }
+public enum VpnLocationKind { Direct, Socks5, OpenVpn }
+// Stored by name in portable settings. Direct is intentionally distinct from None:
+// None makes no launch suggestion, while Direct asks to disconnect an active location.
+public enum PreferredVpnLocation { None, Direct, USA, Canada, UnitedKingdom }
+
+public sealed class VpnLocationLastUsed
+{
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public VpnLocationKind Kind { get; set; }
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public NordLocationId? Socks5Location { get; set; }
+    public string? Country { get; set; }
+    public string? ServerName { get; set; }
+}
 
 public sealed class ServiceDefinition
 {
@@ -34,6 +48,13 @@ public sealed class ServiceDefinition
     public string? BuiltInServiceId { get; set; }
     public int BuiltInDefinitionRevision { get; set; }
     public DateTime AddedUtc { get; set; } = DateTime.UtcNow;
+    // Presentation-only fields. Missing values in older portable settings deserialize to false,
+    // preserving every existing service on Home in its current order.
+    public bool IsFavorite { get; set; }
+    public bool IsHiddenFromHome { get; set; }
+    // A launch-time suggestion only. Missing values in existing settings deserialize to None.
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public PreferredVpnLocation PreferredVpnLocation { get; set; } = PreferredVpnLocation.None;
     // Build #2 uses one shared browser profile. Earlier modes remain only to preserve
     // configuration and on-disk data during migration; they are no longer selected for launch.
     [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -76,9 +97,12 @@ public sealed class MonkeySettings
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public ServiceSorting ServiceSorting { get; set; } = ServiceSorting.Custom;
     public bool CurrentLocationEnabled { get; set; }
+    // Retained only so prior settings files deserialize. It is migrated into the unified feature.
     public bool VpnLocationV2ExperimentEnabled { get; set; }
     // This is a convenience only. Startup always begins on Direct and never reconnects it.
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public NordLocationId? LastUsedNordLocation { get; set; }
+    // Convenience only. Startup always remains Direct.
+    public VpnLocationLastUsed? LastUsedVpnLocation { get; set; }
     public List<ServiceDefinition> Services { get; set; } = new();
 }

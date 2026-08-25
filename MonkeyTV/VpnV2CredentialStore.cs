@@ -9,7 +9,9 @@ internal static class VpnV2CredentialStore
     private static string FilePath => Path.Combine(PortablePaths.SettingsDirectory, "nord-vpn-v2-credentials.dat");
     private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("MonkeyTV.Experimental.VpnLocationV2.NordCredentials");
 
-    public static bool HasCredentials => Load() is not null;
+    public static bool HasCredentials => NordCredentialStore.HasCredentials;
+    internal static NordCredentials? LoadLegacy() => Load();
+    internal static void ClearLegacy() => Clear();
 
     public static NordCredentials? Load()
     {

@@ -11,9 +11,17 @@ public static class NordCredentialStore
     private static string FilePath => Path.Combine(PortablePaths.SettingsDirectory, "nord-credentials.dat");
     private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("MonkeyTV.Feature.0.01.NordCredentials");
 
-    public static bool HasCredentials => File.Exists(FilePath) && Load() is not null;
+    public static bool HasCredentials => Load() is not null;
     public static NordCredentials? Load()
     {
+        if (!File.Exists(FilePath))
+        {
+            var legacy = VpnV2CredentialStore.LoadLegacy();
+            if (legacy is null) return null;
+            Save(legacy.Username, legacy.Password);
+            VpnV2CredentialStore.ClearLegacy();
+            return legacy;
+        }
         try
         {
             var encrypted = File.ReadAllBytes(FilePath);
@@ -31,5 +39,5 @@ public static class NordCredentialStore
         var temp = FilePath + ".tmp";
         File.WriteAllBytes(temp, encrypted); File.Move(temp, FilePath, true);
     }
-    public static void Clear() { try { if (File.Exists(FilePath)) File.Delete(FilePath); } catch { } }
+    public static void Clear() { try { if (File.Exists(FilePath)) File.Delete(FilePath); } catch { } VpnV2CredentialStore.ClearLegacy(); }
 }

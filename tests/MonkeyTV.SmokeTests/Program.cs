@@ -1,6 +1,8 @@
 using MonkeyTV;
 using System.IO.Compression;
+using System.Reflection;
 using System.Windows.Media.Imaging;
+using Microsoft.Web.WebView2.Core;
 
 static void Require(bool condition, string message)
 {
@@ -8,9 +10,9 @@ static void Require(bool condition, string message)
 }
 
 PortablePaths.EnsureCreated();
-Require(App.DisplayVersion == "0.05-alpha", "Release version metadata is incorrect.");
+Require(App.DisplayVersion == "0.06-alpha", "Release version metadata is incorrect.");
 Require(App.BuildNumber == "1", "Build #1 metadata is incorrect.");
-Require(App.AlphaWarningKey == "0.05-alpha-build-1", "Alpha warning is not keyed to v0.05 Build #1.");
+Require(App.AlphaWarningKey == "0.06-alpha-build-1", "Alpha warning is not keyed to v0.06 Build #1.");
 Require(NordLocationCatalog.All.Count >= 3, "Nord location catalog is missing documented presets.");
 var absentRuntime = WebViewRuntimeResolver.InspectFixedRuntime(Path.Combine(PortablePaths.CacheDirectory, "missing-fixed-runtime"));
 Require(absentRuntime.Kind == WebViewRuntimeKind.FixedUnavailable && !absentRuntime.IsFixed, "A missing Fixed Version runtime was not rejected.");
@@ -23,20 +25,20 @@ Require(!NordLocationCatalog.ForPickerCountry("Canada").Any() && !NordLocationCa
 var locationSettings = new MonkeySettings { LastUsedNordLocation = NordLocationId.NewYork };
 var locationStore = new SettingsStore(); locationStore.Save(locationSettings);
 Require(locationStore.Load().LastUsedNordLocation == NordLocationId.NewYork, "Last used Nord location did not persist as a convenience setting.");
+Require(locationStore.Load().LastUsedVpnLocation?.Socks5Location == NordLocationId.NewYork, "Legacy SOCKS5 last used location did not migrate to unified VPN Location.");
 locationSettings.CurrentLocationEnabled = true; locationStore.Save(locationSettings);
 Require(locationStore.Load().CurrentLocationEnabled, "Current Location Home visibility preference did not persist.");
-Require(!new MonkeySettings().VpnLocationV2ExperimentEnabled, "VPN Location V2 must default to disabled.");
-Require(VpnV2LocationCatalog.All.Select(item => item.Country).SequenceEqual(new[] { "United States", "Canada", "United Kingdom" }), "VPN Location V2 download catalog changed unexpectedly.");
+Require(VpnV2LocationCatalog.All.Select(item => item.Country).SequenceEqual(new[] { "Canada", "United Kingdom" }), "VPN Location download catalog changed unexpectedly.");
 if (args.Contains("--vpn-v2-download-test", StringComparer.OrdinalIgnoreCase))
 {
     var result = await VpnV2LocationCatalog.DownloadCountryAsync(VpnV2LocationCatalog.All.Single(item => item.Country == "Canada"));
     var downloaded = VpnV2ConfigStore.Load().Where(item => item.Country == "Canada").ToList();
     Require(result.InstalledCount > 1 && downloaded.Count == result.InstalledCount && downloaded.All(item => File.Exists(item.FullPath)),
-        "VPN Location V2 did not install all matching official Nord country configurations.");
+        "VPN Location did not install all matching official Nord country configurations.");
     foreach (var item in downloaded) VpnV2ConfigStore.Remove(item.Id);
 }
-locationSettings.VpnLocationV2ExperimentEnabled = true; locationStore.Save(locationSettings);
-Require(locationStore.Load().VpnLocationV2ExperimentEnabled, "VPN Location V2 opt-in did not persist.");
+locationSettings = new MonkeySettings { VpnLocationV2ExperimentEnabled = true }; locationStore.Save(locationSettings);
+Require(locationStore.Load().CurrentLocationEnabled && !locationStore.Load().VpnLocationV2ExperimentEnabled, "Legacy VPN Location experiment setting did not migrate.");
 var v2ImportRoot = Path.Combine(Path.GetTempPath(), "MonkeyTV-v2-config-test-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(v2ImportRoot);
 var v2ImportPath = Path.Combine(v2ImportRoot, "ca1968.nordvpn.com.udp_2.6.ovpn");
@@ -55,7 +57,7 @@ test-public-tls-auth
 </tls-auth>
 """);
 var importedV2 = VpnV2ConfigStore.Import(v2ImportPath);
-Require(importedV2.Country == "Canada" && importedV2.ServerName == "ca1968.nordvpn.com" && File.Exists(importedV2.FullPath), "The proven V2 config was not imported safely.");
+Require(importedV2.Country == "Canada" && importedV2.ServerName == "ca1968.nordvpn.com" && File.Exists(importedV2.FullPath), "The Canada configuration was not imported safely.");
 VpnV2ConfigStore.Remove(importedV2.Id);
 Directory.Delete(v2ImportRoot, true);
 await using (var directRouter = new CurrentLocationRouter())
@@ -119,8 +121,65 @@ Require(migrated.Theme == AppTheme.System && migrated.Accent == AppAccent.System
 Require(migrated.Services[0].BannerPath is null, "Existing service unexpectedly gained banner artwork.");
 Require(migrated.Services[0].BrowserStorageMode == BrowserStorageMode.UnifiedSharedProfile, "Build #2 migration did not select the unified browser profile.");
 Require(migrated.Services[0].FutureSettings.ContainsKey("Build1ProfilePath"), "Build #1 named profile was not retained for safe migration.");
+Require(migrated.Services[0].PreferredVpnLocation == PreferredVpnLocation.None, "Legacy service unexpectedly gained a preferred VPN location.");
 
 var tv = new ServiceDefinition { Name = "TV", Url = "https://www.youtube.com/tv", Experience = ServiceExperience.TV };
+var organizedService = new ServiceDefinition { Name = "Favorite", Url = "https://example.com", IsFavorite = true, IsHiddenFromHome = true, PreferredVpnLocation = PreferredVpnLocation.UnitedKingdom };
+var editorCloneMethod = typeof(ServiceEditorWindow).GetMethod("Clone", BindingFlags.NonPublic | BindingFlags.Static);
+var editorClone = editorCloneMethod?.Invoke(null, new object[] { organizedService }) as ServiceDefinition;
+Require(editorClone is { IsFavorite: true, IsHiddenFromHome: true }, "Edit Service lost favorite or Home visibility state.");
+Require(editorClone?.PreferredVpnLocation == PreferredVpnLocation.UnitedKingdom, "Edit Service lost the preferred VPN location.");
+Require(PreferredVpnLocationPolicy.Matches(PreferredVpnLocation.None, CurrentLocationState.Direct, null, null), "None should never request a route change.");
+Require(PreferredVpnLocationPolicy.Matches(PreferredVpnLocation.Direct, CurrentLocationState.Direct, null, null), "Direct preference did not accept Direct.");
+Require(!PreferredVpnLocationPolicy.Matches(PreferredVpnLocation.Direct, CurrentLocationState.Connected, NordLocationCatalog.Get(NordLocationId.Atlanta), null), "Direct preference incorrectly accepted an active VPN location.");
+Require(PreferredVpnLocationPolicy.Matches(PreferredVpnLocation.USA, CurrentLocationState.Connected, NordLocationCatalog.Get(NordLocationId.Atlanta), null), "A USA city route did not satisfy a USA preference.");
+Require(!PreferredVpnLocationPolicy.Matches(PreferredVpnLocation.Canada, CurrentLocationState.Direct, null, null), "Direct incorrectly satisfied a Canada preference.");
+Require(PreferredVpnLocationPolicy.Matches(PreferredVpnLocation.Canada, CurrentLocationState.Connected, null,
+    new VpnV2ImportedConfig(Guid.NewGuid(), "Canada", "test", "udp", "test.ovpn")), "Canada route did not satisfy a Canada preference.");
+Require(ServiceLaunchProgress.ForRoute(new LocationRouteProgress(LocationRouteProgressStage.Connecting, "Canada")) == "Connecting to Canada…", "Launch progress did not expose the real Canada connection stage.");
+Require(ServiceLaunchProgress.ForRoute(new LocationRouteProgress(LocationRouteProgressStage.TryingAnotherConnection, "United Kingdom")) == "Trying another United Kingdom connection…", "Launch progress did not expose a real fallback stage.");
+Require(ServiceLaunchProgress.ForExperience(new ServiceDefinition { Experience = ServiceExperience.TV }) == "Applying TV Experience…", "Launch progress did not identify TV Experience.");
+Require(ServiceLaunchProgress.ForExperience(new ServiceDefinition { CustomUserAgentOverride = "test" }) == "Applying custom browser identity…", "Launch progress did not identify a custom browser identity.");
+
+Require(SessionPermissionStore.TryCreateKey("https://www.paramountplus.com/shows/example", CoreWebView2PermissionKind.Geolocation, out var paramountLocation), "Permission origin was not recognized.");
+Require(SessionPermissionStore.TryCreateKey("https://www.paramountplus.com/account?step=2", CoreWebView2PermissionKind.Geolocation, out var paramountLocationAgain) && paramountLocation == paramountLocationAgain,
+    "Same-origin navigation produced a different permission identity.");
+Require(SessionPermissionStore.TryCreateKey("https://www.paramountplus.com/", CoreWebView2PermissionKind.Camera, out var paramountCamera) && paramountCamera != paramountLocation,
+    "Different permission types were not isolated.");
+Require(SessionPermissionStore.TryCreateKey("https://auth.paramountplus.com/", CoreWebView2PermissionKind.Geolocation, out var paramountAuth) && paramountAuth != paramountLocation,
+    "Different origins were not isolated.");
+var permissionTestRoot = Path.Combine(Path.GetTempPath(), "MonkeyTV-permissions-" + Guid.NewGuid().ToString("N"));
+var permissionFile = Path.Combine(permissionTestRoot, "site-permissions.json");
+var permissionStore = new SessionPermissionStore(permissionFile);
+var permissionPromptCount = 0;
+var firstPermission = permissionStore.GetOrPromptAsync(paramountLocation, async () => { permissionPromptCount++; await Task.Delay(20); return CoreWebView2PermissionState.Allow; });
+var duplicatePermission = permissionStore.GetOrPromptAsync(paramountLocationAgain, () => { permissionPromptCount++; return Task.FromResult(CoreWebView2PermissionState.Deny); });
+Require(await firstPermission == CoreWebView2PermissionState.Allow && await duplicatePermission == CoreWebView2PermissionState.Allow && permissionPromptCount == 1,
+    "Simultaneous same-origin permission requests were not coalesced.");
+Require(await permissionStore.GetOrPromptAsync(paramountLocation, () => { permissionPromptCount++; return Task.FromResult(CoreWebView2PermissionState.Deny); }) == CoreWebView2PermissionState.Allow && permissionPromptCount == 1,
+    "A saved permission decision was not reused during the page session.");
+Require(File.Exists(permissionFile), "The portable permission decision file was not created.");
+
+var restartedPermissionStore = new SessionPermissionStore(permissionFile);
+Require(await restartedPermissionStore.GetOrPromptAsync(paramountLocationAgain, () => { permissionPromptCount++; return Task.FromResult(CoreWebView2PermissionState.Deny); }) == CoreWebView2PermissionState.Allow && permissionPromptCount == 1,
+    "An explicit permission decision did not survive a simulated Monkey TV restart.");
+Require(await restartedPermissionStore.GetOrPromptAsync(paramountCamera, () => { permissionPromptCount++; return Task.FromResult(CoreWebView2PermissionState.Deny); }) == CoreWebView2PermissionState.Deny && permissionPromptCount == 2,
+    "An unrecorded permission type was automatically granted.");
+var restartedAfterDeny = new SessionPermissionStore(permissionFile);
+Require(await restartedAfterDeny.GetOrPromptAsync(paramountCamera, () => { permissionPromptCount++; return Task.FromResult(CoreWebView2PermissionState.Allow); }) == CoreWebView2PermissionState.Deny && permissionPromptCount == 2,
+    "An explicit Deny decision did not survive a simulated Monkey TV restart.");
+
+restartedAfterDeny.ClearForHosts(["paramountplus.com"]);
+var afterServiceReset = new SessionPermissionStore(permissionFile);
+Require(await afterServiceReset.GetOrPromptAsync(paramountLocation, () => { permissionPromptCount++; return Task.FromResult(CoreWebView2PermissionState.Deny); }) == CoreWebView2PermissionState.Deny && permissionPromptCount == 3,
+    "Reset Service did not clear the site's persistent permission decisions.");
+afterServiceReset.ClearAll();
+Require(!File.Exists(permissionFile), "Reset All Website Data did not remove the persistent permission store.");
+var afterFullReset = new SessionPermissionStore(permissionFile);
+Require(await afterFullReset.GetOrPromptAsync(paramountLocation, () => { permissionPromptCount++; return Task.FromResult(CoreWebView2PermissionState.Allow); }) == CoreWebView2PermissionState.Allow && permissionPromptCount == 4,
+    "Reset All Website Data did not make the origin ask again.");
+afterFullReset.ClearAll();
+if (Directory.Exists(permissionTestRoot)) Directory.Delete(permissionTestRoot, true);
 Require(BrowserIdentity.ResolveUserAgent(tv) == BrowserIdentity.TvUserAgent, "TV Experience did not resolve the built-in TV UA.");
 tv.CustomUserAgentOverride = "Debug-UA";
 Require(BrowserIdentity.ResolveUserAgent(tv) == "Debug-UA", "Custom override did not take precedence over TV Experience.");
@@ -131,6 +190,7 @@ store.Save(migrated);
 var reloaded = store.Load();
 var restoredTv = reloaded.Services.Single(s => s.Name == "TV");
 Require(restoredTv.Experience == ServiceExperience.TV, "TV Experience did not persist across reload.");
+Require(restoredTv.PreferredVpnLocation == PreferredVpnLocation.None, "New service did not retain the default None VPN preference.");
 Require(BrowserIdentity.ResolveUserAgent(restoredTv) == BrowserIdentity.TvUserAgent, "Reloaded TV Experience did not restore its UA.");
 Require(store.Load().Services.All(service => service.BrowserStorageMode == BrowserStorageMode.UnifiedSharedProfile), "New services did not persist the unified browser profile mode.");
 Require(StorageService.MeasureServices(store.Load().Services).Count == 0, "Shared browser storage was incorrectly attributed to services.");
@@ -206,9 +266,6 @@ restoredTv.BannerPath = "builtin:general/youtube-tv";
 store.Save(reloaded);
 Require(store.Load().Services.Single(s => s.Id == restoredTv.Id).BannerFit == BannerFit.Fit, "Banner Fit did not persist.");
 Require(store.Load().Services.Single(s => s.Id == restoredTv.Id).BannerPath == "builtin:general/youtube-tv", "Built-in artwork selection did not persist.");
-Require(PrereleaseVersion.Compare("v0.0.2-alpha", "v0.0.1-alpha") > 0, "Prerelease version comparison failed.");
-Require(PrereleaseVersion.Compare("v1.0.0", "v1.0.0-beta") > 0, "Stable version should sort after its prerelease.");
-
 var sensitiveProfile = PortablePaths.ProfileFor(restoredTv.Id);
 File.WriteAllText(Path.Combine(sensitiveProfile, "cookie-secret.test"), "must-not-export");
 var backupFile = Path.Combine(PortablePaths.CacheDirectory, "smoke.mtvbackup");
@@ -217,6 +274,7 @@ using (var archive = ZipFile.OpenRead(backupFile))
 {
     Require(archive.GetEntry("settings.json") is not null, "Backup omitted settings.");
     Require(archive.Entries.All(e => !e.FullName.Contains("Profiles", StringComparison.OrdinalIgnoreCase)), "Backup exported browser-profile data.");
+    Require(archive.Entries.All(e => !e.FullName.Contains("permission", StringComparison.OrdinalIgnoreCase)), "Backup exported saved website permissions.");
 }
 var preview = BackupService.Validate(backupFile);
 Require(preview.Settings.Services.Count == reloaded.Services.Count, "Backup validation lost services.");
@@ -255,6 +313,70 @@ StorageService.ClearAllTemporaryData();
 Require(!Directory.Exists(temporaryFolder), "Known temporary browser cache was not removed.");
 Require(File.Exists(Path.Combine(persistentFolder, "keep.test")), "Temporary cleanup removed persistent DOM storage.");
 
+var shutdownPermissionStore = new SessionPermissionStore();
+shutdownPermissionStore.ClearAll();
+Require(SessionPermissionStore.TryCreateKey("https://shutdown-permission.example/watch", CoreWebView2PermissionKind.Geolocation, out var shutdownPermissionKey),
+    "Shutdown permission origin was not recognized.");
+var shutdownPermissionPrompts = 0;
+Require(await shutdownPermissionStore.GetOrPromptAsync(shutdownPermissionKey, () =>
+{
+    shutdownPermissionPrompts++;
+    return Task.FromResult(CoreWebView2PermissionState.Allow);
+}) == CoreWebView2PermissionState.Allow, "Shutdown permission setup failed.");
+var shutdownPermissionFile = Path.Combine(PortablePaths.SettingsDirectory, "site-permissions.json");
+Require(File.Exists(shutdownPermissionFile), "Persistent permission data was not written before shutdown cleanup.");
+
+var shutdownProfileRoot = Path.Combine(PortablePaths.SharedBrowserUserDataDirectory, "ShutdownCleanupProof");
+var shutdownDisposableFolders = new[] { "Cache", "Code Cache", "GPUCache", "DawnWebGPUCache", "BrowserMetrics", "Crashpad", "PKIMetadata" }
+    .Select(name => Path.Combine(shutdownProfileRoot, name)).ToArray();
+foreach (var folder in shutdownDisposableFolders)
+{
+    Directory.CreateDirectory(folder);
+    File.WriteAllText(Path.Combine(folder, "temporary.test"), "remove");
+}
+var shutdownPersistentFolders = new[] { "Local Storage", "IndexedDB", Path.Combine("Service Worker", "CacheStorage"), "Network", "MediaFoundationCdm" }
+    .Select(name => Path.Combine(shutdownProfileRoot, name)).ToArray();
+foreach (var folder in shutdownPersistentFolders)
+{
+    Directory.CreateDirectory(folder);
+    File.WriteAllText(Path.Combine(folder, "persistent.test"), "keep");
+}
+var monkeyTemporaryFile = Path.Combine(PortablePaths.CacheDirectory, "shutdown-temporary.test");
+File.WriteAllText(monkeyTemporaryFile, "remove");
+
+StorageService.ClearShutdownTemporaryData();
+Require(shutdownDisposableFolders.All(folder => !Directory.Exists(folder)), "Shutdown cleanup retained disposable browser/runtime artifacts.");
+Require(shutdownPersistentFolders.All(folder => File.Exists(Path.Combine(folder, "persistent.test"))), "Shutdown cleanup removed persistent provider/browser state.");
+Require(!File.Exists(monkeyTemporaryFile), "Shutdown cleanup retained Monkey TV temporary data.");
+Require(File.Exists(shutdownPermissionFile), "Shutdown cleanup deleted persistent website permissions.");
+var reopenedPermissionStore = new SessionPermissionStore();
+Require(await reopenedPermissionStore.GetOrPromptAsync(shutdownPermissionKey, () =>
+{
+    shutdownPermissionPrompts++;
+    return Task.FromResult(CoreWebView2PermissionState.Deny);
+}) == CoreWebView2PermissionState.Allow && shutdownPermissionPrompts == 1,
+    "Shutdown cleanup lost the persisted permission decision.");
+reopenedPermissionStore.ClearForHosts(["shutdown-permission.example"]);
+var afterShutdownServiceReset = new SessionPermissionStore();
+Require(await afterShutdownServiceReset.GetOrPromptAsync(shutdownPermissionKey, () =>
+{
+    shutdownPermissionPrompts++;
+    return Task.FromResult(CoreWebView2PermissionState.Deny);
+}) == CoreWebView2PermissionState.Deny && shutdownPermissionPrompts == 2,
+    "Reset Service did not clear a permission preserved through shutdown.");
+afterShutdownServiceReset.ClearAll();
+
+var storageAccountingRoot = Path.Combine(Path.GetTempPath(), "MonkeyTV-storage-accounting-" + Guid.NewGuid().ToString("N"));
+var storageAccountingRequirements = Path.Combine(storageAccountingRoot, "Requirements", "WebView2Fixed");
+var storageAccountingUserData = Path.Combine(storageAccountingRoot, "Browser", "Shared");
+Directory.CreateDirectory(storageAccountingRequirements); Directory.CreateDirectory(storageAccountingUserData);
+File.WriteAllBytes(Path.Combine(storageAccountingUserData, "user-data.bin"), new byte[4096]);
+var userDataSizeBeforeRequirementsGrowth = StorageService.UserDataSize(storageAccountingRoot);
+File.WriteAllBytes(Path.Combine(storageAccountingRequirements, "bundled-runtime.bin"), new byte[2 * 1024 * 1024]);
+Require(StorageService.UserDataSize(storageAccountingRoot) == userDataSizeBeforeRequirementsGrowth && userDataSizeBeforeRequirementsGrowth == 4096,
+    "Bundled Data\\Requirements files changed the user-facing storage total.");
+Directory.Delete(storageAccountingRoot, true);
+
 var queuedSharedProfile = Path.Combine(PortablePaths.SharedBrowserUserDataDirectory, "synthetic-profile");
 Directory.CreateDirectory(queuedSharedProfile); File.WriteAllText(Path.Combine(queuedSharedProfile, "state.test"), "remove");
 StorageService.QueueSharedProfileDeletion(Path.GetRelativePath(PortablePaths.AppRoot, queuedSharedProfile));
@@ -266,4 +388,4 @@ var retainedLogBytes = Directory.Exists(PortablePaths.LogsDirectory)
     ? Directory.EnumerateFiles(PortablePaths.LogsDirectory, "monkey.log*").Sum(f => new FileInfo(f).Length) : 0;
 Require(retainedLogBytes <= AppLog.MaximumRetainedBytes + 4096, "Log retention exceeded its bound.");
 
-Console.WriteLine("PASS: migration, Experience, appearance, TV UA, banner fit/dedup, backup privacy/import, cache classification/cleanup, recovery marker, prerelease versions, and bounded logs.");
+Console.WriteLine("PASS: migration, Experience, appearance, TV UA, banner fit/dedup, backup privacy/import, cache classification/cleanup, recovery marker, and bounded logs.");

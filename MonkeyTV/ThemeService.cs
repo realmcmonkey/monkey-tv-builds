@@ -65,17 +65,13 @@ internal static class ThemeService
     {
         if (accent == AppAccent.System)
         {
-            try
-            {
-                var color = SystemParameters.WindowGlassColor;
-                if (color.A > 0) return Color.FromRgb(color.R, color.G, color.B);
-            }
-            catch { }
-            return (Color)ColorConverter.ConvertFromString("#7C5CFC");
+            // Monkey TV has its own light-blue visual identity. Do not inherit an arbitrary
+            // Windows system accent such as red into the application shell.
+            return (Color)ColorConverter.ConvertFromString("#46B7FF");
         }
         return (Color)ColorConverter.ConvertFromString(accent switch
         {
-            AppAccent.Blue => "#2563EB",
+        AppAccent.Blue => "#46B7FF",
             AppAccent.Green => "#168A55",
             AppAccent.Orange => "#C86516",
             AppAccent.Red => "#C33B43",

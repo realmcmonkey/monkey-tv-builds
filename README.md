@@ -1,61 +1,66 @@
 # Monkey TV
 
-Monkey TV is a portable Windows streaming-service launcher. It opens one configured website at a time in one reusable Microsoft Edge WebView2. Home immediately mutes and hides the active service, then suspends it so the same service can resume where it was left; choosing a different service hides that WebView behind a launch transition and navigates the same instance to the new destination. It does not host, download, capture, decrypt, or modify streaming content.
+Monkey TV is a personal Windows streaming-service launcher. It brings your configured streaming websites together in one desktop application while keeping provider accounts, subscriptions, playback, DRM, and availability under each provider’s control.
 
-Current version: **v0.05-alpha — Build #1**
+Monkey TV does **not** host, record, capture, decrypt, or bypass protected streaming content or provider protections.
 
-## Try the packaged alpha
+## Run the current local test build
 
-Extract the complete V2 release archive to a writable folder on a Windows 11 x64 PC, then run `MonkeyTV.exe`. Keep the EXE and `Data` folder together. The archive includes Monkey TV's separately installed, app-owned Fixed Version WebView2 Runtime Pack required by experimental VPN Location V2. The app creates its portable configuration, icons, cache, and one shared browser profile inside `Data`.
+1. Open [`builds/Test Build`](builds/Test%20Build).
+2. Run `MonkeyTV.exe`.
+3. Keep `MonkeyTV.exe` and its adjacent `Data` folder together.
 
-Streaming-service login and DRM/playback must be tested by the user with their own accounts; no provider has been certified by this project.
+`Data` contains Monkey TV’s portable settings, artwork, browser profile, logs, and downloaded location setup. Its `Data\\Requirements` subfolder contains required bundled runtime components for this test build.
 
-## What works in this alpha
+Do not delete or move `Data\\Requirements` by itself. If you want to reset browser sign-ins or Monkey TV data, use the in-app reset controls rather than deleting the whole folder.
 
-- Version-aware alpha warning and per-version dismissal
-- Branded three-second-minimum startup splash; no browser or service is initialized on Home
-- Three-screen first-time setup
-- Generic services using name + URL
-- Best-effort website icon discovery and manual icon replacement
-- Configurable tile size, names, and clock
-- Responsive Banner/Square Home cards with Small/Medium/Large sizing
-- System/Light/Dark themes, restrained accent choices, and remembered safe on-screen window placement
-- Subtle expandable configured-service name search
-- Searchable catalog of 46 embedded default banners, local automatic matching, website artwork discovery, and portable manual overrides
-- Add, edit, remove, and reorder services
-- Settings and modern per-card Open/Edit/Move/Banner/Cleanup/Remove actions
-- Per-service Default Experience or TV Experience, with an optional Advanced custom-UA override
-- Per-service banner Fill/Fit, optimized portable banner imports, and safe site-data clearing
-- On-demand WebView2 creation; no service preloading
-- One reusable WebView2 and one shared portable browser profile for every configured service
-- Optional browser-only Current Location selector: Direct at every startup, or user-selected documented NordVPN SOCKS5 presets using protected Nord service credentials (not a device-wide VPN)
-- Opt-in experimental VPN Location V2: Settings can download all official UDP configurations for United States, Canada, or United Kingdom from Nord's documented all-server archive into portable `Data/VpnV2/Configs`; downloaded locations then appear in the Home Current Location picker. V1 remains the default.
-- Local Choose / Manage Services library using bundled artwork only, plus optional Home sorting and Custom drag ordering
-- Same-service Home resume; different services reuse the same WebView and navigate it to the new destination
-- Local-artwork launch transition hides the previous website until a different service finishes its initial navigation
-- Friendly navigation/process-failure screens with Retry and Home
-- Controlled same-profile sign-in popups, deliberate external-link routing, session-only permission prompts, and Windows Save dialogs for website downloads
-- Browser zoom locked to the normal 100% service-view scale
-- Portable configuration export/import that excludes logins and browser profiles
-- On-demand Settings storage reporting, bounded logs, unclean-shutdown recovery, and a diagnostic About page
-- Storage management with safe temporary-data cleanup, a low-storage-oriented 100 MiB soft cache target, destructive browser-data reset, and full Monkey TV reset
-- F11, Alt+Left, Ctrl+R, Ctrl+H, and Ctrl+, shortcuts
-- Auto-hiding Back, Reload, Home, and fullscreen flyout with top-edge reveal
-- True borderless F11 fullscreen with normal/maximized state restoration and coordinated website fullscreen Escape behavior
-- Self-contained x64 single-file publishing
+Do not copy another person’s `Data` folder into your build: it can contain Windows-protected credentials, browser sign-ins, and provider state.
 
-Development, architecture, limitations, and test details are in [`docs`](docs/ARCHITECTURE.md).
+## What Monkey TV includes
+
+- Integrated **Home**, **Services**, and **Settings** navigation.
+- An artwork-first service launcher with Favorites and a personal service library.
+- Service editing with artwork preview, Fit/Fill presentation, browser-experience settings, and safe test actions.
+- One shared browser profile that preserves normal provider sign-ins and website state.
+- Per-service Default Experience, TV Experience, or advanced custom browser identity settings.
+- Optional Preferred VPN Location suggestions for individual services.
+- **VPN Location** choices for Direct, USA, Canada, and United Kingdom.
+- Real service-launch status using actual route and browser lifecycle progress.
+- Persistent browser-style camera, microphone, location, and clipboard permission decisions.
+- System, Light, and Dark themes, accessibility-focused keyboard behavior, and Reduced Motion support.
+- Portable Monkey TV data beside the application.
+
+## Important behavior
+
+- New installations start at Home. General settings can optionally reopen the last service after Home is ready.
+- VPN Location always starts **Direct**. Monkey TV never automatically reconnects a previous location at startup.
+- Home does not initialize a browser or contact a streaming provider until you select a service.
+- Monkey TV uses one shared browser/profile for configured services, so normal provider sign-ins and website state can persist.
+- Reset Service and Reset All Website Data can clear website state and remembered permission decisions when needed.
+- Configuration exports intentionally exclude browser profiles, cookies, sign-ins, credentials, caches, logs, and protected provider state.
+- Streaming-provider compatibility, protected playback, and regional availability must be tested manually with your own accounts. Monkey TV does not bypass provider decisions or protections.
+
+## Documents
+
+| Document | Purpose |
+| --- | --- |
+| [Build guide](docs/BUILD.md) | Build or refresh a local test copy. |
+| [Architecture](docs/ARCHITECTURE.md) | Core application lifecycle and boundaries. |
+| [VPN Location](docs/VPN_LOCATION.md) | Current routing design and safety boundaries. |
+| [Native helper source](native/MonkeyTV.UserSpaceOpenVpnHelper/README.md) | Maintained source, pins, and rebuild provenance for the shipped user-space VPN helper. |
+| [VPN proof archive](research/VPN_PROOF_ARCHIVE.md) | Historical proof context; not a current build or runtime dependency. |
+| [Known limitations](docs/KNOWN_LIMITATIONS.md) | Important manual-testing and provider limitations. |
+| [Alpha testing checklist](docs/ALPHA_TESTING.md) | Hands-on validation before a release. |
+| [Changelog](CHANGELOG.md) | Detailed development history. |
+| [Third-party notices](THIRD-PARTY-NOTICES.md) | Dependency and license information. |
 
 ## Development quick start
 
-Requirements: Windows 11 x64, .NET 8 SDK or newer, and internet access for NuGet restore. V2 development additionally needs the separately obtained Microsoft Fixed Version WebView2 Runtime Pack described in the build documentation.
+Requirements: Windows 11 x64, Git, the .NET 8 SDK, and NuGet access. The current VPN Location test build also needs the runtime dependencies under `Runtime`; the ignored Fixed WebView2 runtime must be copied or installed separately on a new development PC.
 
 ```powershell
 dotnet restore .\MonkeyTV\MonkeyTV.csproj
-dotnet build .\MonkeyTV\MonkeyTV.csproj -c Release
-dotnet run --project .\MonkeyTV\MonkeyTV.csproj -c Release
+dotnet build .\MonkeyTV\MonkeyTV.csproj -c Release --no-restore
 ```
 
-See [Build and packaging](docs/BUILD.md) for the reproducible publish command.
-
-Monkey TV always launches to Home. It never automatically reopens the service from a prior session, including after crash recovery.
+See the [Build guide](docs/BUILD.md) for the publish command, cleanup rules, native-helper prerequisites, and the main-PC transfer checklist.

@@ -7,7 +7,7 @@ namespace MonkeyTV;
 
 public partial class App : Application
 {
-    private const string FallbackVersion = "0.05-alpha";
+    private const string FallbackVersion = "0.06-alpha";
     private static readonly TimeSpan MinimumSplashDuration = TimeSpan.FromSeconds(3);
     internal static long LastStartupMilliseconds { get; private set; }
 

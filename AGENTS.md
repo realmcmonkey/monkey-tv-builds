@@ -1,71 +1,122 @@
 # AGENTS.md
 
-## Project invariant
+## Purpose and precedence
 
-Monkey TV is a legitimate streaming-site launcher, never a content host or DRM workaround. Do not add downloading, recording, capture, decryption, proxying, ad injection, DRM bypass, or provider-protection bypass behavior.
+These instructions describe the current Monkey TV product and architecture. Prefer durable product, privacy, security, lifecycle, and release invariants over historical build notes. Historical implementations and completed feasibility work belong in documentation and `CHANGELOG.md`, not here.
 
-## Product rules
+When changing behavior, inspect the current implementation first. Preserve working systems unless the user explicitly authorizes changing them. Keep changes scoped, backward-compatible, and testable.
+
+## Product boundary
+
+- Monkey TV is a personal Windows streaming-site launcher. It is not a content host, recorder, capture tool, DRM implementation, or provider-protection workaround.
+- Do not add recording, stream ripping, capture, decryption, DRM bypass, provider-protection bypass, ad injection, advertising, telemetry, analytics, or service-usage tracking.
+- Use WebView2's legitimate provider-controlled playback and DRM capabilities. Never claim provider, account, catalogue, protected-playback, or DRM compatibility without hands-on testing.
+- Normal user-initiated website downloads may use WebView2's download flow, but every download requires an explicit native Windows Save destination outside Monkey TV's portable `Data`. Do not add a streaming-content downloader.
+- Keep services generic and data-driven. Put exceptional provider behavior in explicit optional service settings rather than scattered provider-specific conditionals.
+
+## Supported platform and application shell
 
 - Target Windows 11 x64 with mouse and keyboard.
-- Keep all app-controlled writable data below `Data` next to the executable. Do not intentionally use AppData, LocalAppData, Documents, the registry, or absolute machine-specific paths.
-- Never preload, ping, or create browsers for configured services while on Home.
-- Startup must show the lightweight branded splash promptly for at least three seconds and longer when Home is not ready. It must not initialize WebView2, navigate a service, or contact a provider.
-- Create one WebView2 only after the first service click, then reuse that exact WebView for every service. Home must immediately mute and hide it, render Home without awaiting browser work, and call `TrySuspendAsync` only after the controller is invisible. Selecting the same service resumes and unmutes its page. Selecting a different service resumes the same WebView, applies the destination configuration, and navigates it away while muted until the new destination is ready. Never allow more than one service WebView.
-- On Home, pause standard finite-duration HTML media and resume only media Monkey TV paused when the same service returns. If standard media APIs clearly identify a live stream, keep it running but muted and do not suspend it. For inaccessible/custom provider players, preserve the safe mute/hide and best-effort WebView2 suspension fallback; never claim perfect live-stream detection.
-- Keep services generic and data-driven. Provider-specific behavior belongs in optional service settings, not scattered conditionals.
-- User-agent mode is per service. Never globally spoof it.
-- Keep System/Light/Dark and accent styling within Monkey TV UI; never inject themes into provider pages. Persist only tiny appearance and validated normal/maximized window-placement fields, never F11 state or a prior service.
-- Permit at most one temporary same-profile child WebView for a user-initiated related/auth popup. Never add tabs or uncontrolled popup windows. Route clearly unrelated user-initiated popup links to the Windows default browser.
-- Web permissions must be conservative and session-only: never auto-enable notifications or persist a Monkey TV permission database. Website downloads require an explicit Windows Save path outside portable `Data`. Keep browser zoom at its normal default and do not add a zoom setting.
-- Use the WebView2 Runtime's legitimate media/DRM support. Never implement DRM.
-- Read the displayed version from assembly metadata. Alpha-warning dismissal is keyed to that exact version.
-- Monkey TV always starts at Home. Do not add Resume Last Service, a startup service, or automatic service reopening unless explicitly requested in the future.
-- Do not add per-service zoom-level or mute-on-launch features unless explicitly requested in the future.
-- Per-service storage information belongs only in Settings, never on Home cards or normal browsing UI.
-- Configuration exports exclude WebView profiles, cookies, credentials, authentication/DRM state, caches, and logs by default.
-- Keep persistent `Data` aggressively size-conscious. New logs, caches, metadata, backups, and migration artifacts must be small and bounded; do not introduce unbounded storage growth.
-- Storage rule: preserve Cookies, Network state, Local Storage, IndexedDB, Cache Storage, service workers, legitimate DRM/provider state, and user preferences by default. Automatic cleanup may only target verified disposable disk cache, code/GPU/shader cache, runtime metrics, crash artifacts, and replaceable component resources when over budget.
-- WebView2 storage rule: all new launches use the one default profile beneath `Data/Browser/Shared`. Build #1 named and isolated profile folders are retained without copying/merging cookies, credentials, or DRM state. Delete retained migration folders only when the user removes the attributable service or explicitly clears all browser data.
-- The temporary browser-data soft target is 100 MiB. Check it every five minutes while a service is active and use WebView2's supported disk-cache cleanup when exceeded. Home only hides, mutes, and suspends the current service so same-service resume changes nothing. Selecting a different service clears supported disposable disk cache before navigating the shared WebView. Clear ordinary disposable data after browser disposal on startup/shutdown. This is a soft working target, not a Chromium quota. Do not use production WebView2 browser flags or undocumented Chromium cache command-line switches.
-- Feature #0.01 exception: Monkey TV may use one fixed, loopback-only WebView2 proxy configuration as a browser-only Current Location boundary. The local gateway may route Direct or through NordVPN's officially documented SOCKS5 endpoints using DPAPI-protected service credentials. This is not permission for arbitrary browser flags or proxying elsewhere, a system-wide VPN, per-service location routing, undocumented Nord APIs, or controlling Nord's extension. Disable QUIC and apply best-effort non-proxied WebRTC UDP restriction only for this feature; document that browser-proxy routing is not an absolute WebRTC/UDP leak-proof boundary. Startup always begins Direct with no Nord/provider traffic; the last Nord location is an inactive flyout convenience only.
-- Current Location v2 is an explicitly authorized experimental proof lane, not production routing. It may evaluate an app-owned Fixed Version WebView2 runtime, a separately installed privileged helper, native IKEv2/VPNv2, and WFP block/permit filters only after the consumer-PC proof gates pass. Never replace the working SOCKS5 route, create a system-wide route, claim fail-closed containment, or expose Canada/UK routing until the documented v2 packet-level proof is complete. The fixed runtime must be a separate installed dependency, never silently substituted with Evergreen for v2.
-- Removed shared-profile data is queued in a tiny settings file and deleted only at a safe point with no active WebView2 UDF. Keep this queue bounded and remove it when empty.
-- Do not add telemetry, analytics, advertising, or service-usage reporting.
-- Only expose settings that function.
-- Preserve the portable source tree: no machine-specific absolute paths.
-
-## Architecture constraints
-
-- Stack: .NET 8 WPF + Microsoft Edge WebView2.
-- Use standard WPF `WebView2`, not `WebView2CompositionControl`: Microsoft's composition control uses screen capture and DRM-protected content can fail. Service controls use a small owned auto-hiding flyout above the HWND surface; never add a large invisible input layer over the website.
+- Stack: .NET 8 WPF and standard Microsoft Edge WebView2. Do not replace it with `WebView2CompositionControl`; protected playback can fail through composition/screen-capture rendering.
 - Release target framework is `net8.0-windows10.0.17763.0`, runtime `win-x64`.
-- Publish self-contained and single-file. The WebView2 Evergreen Runtime remains an external Windows prerequisite.
-- Configuration schema must remain forward-compatible; preserve `FutureSettings` and profile configuration fields.
-- Use one shared WebView2 profile; never invent per-service storage values when the profile is shared.
+- The main window owns the integrated top-level **Home**, **Services**, and **Settings** views. Normal navigation between them must not create extra taskbar windows, recreate the browser, or change the active VPN route.
+- **Edit Service** and **VPN Location** are integrated right-side drawers. Opening or closing either drawer must preserve the originating top-level view. Respect Reduced Motion when animating drawers or other UI.
+- Keep application fullscreen, website fullscreen, Escape/F11 behavior, the persistent top navigation, and the visible application-fullscreen exit control working together.
+- Use native Windows file and folder pickers where the user chooses an external path.
 
-## Before handing off a build
+## Startup and browser lifecycle
 
-1. Build Release with zero errors.
-2. Publish self-contained single-file x64.
-3. Test warning, clean setup, Home, search, Settings, a benign website, Back/Reload/Home, WebView disposal, restart, F11/Escape, and portable paths.
-4. Package a fresh empty `Data` directory; never ship test profiles, credentials, cookies, or settings.
-5. Update docs and known limitations. Do not claim a provider or DRM flow works without manual account testing.
+- Home is the default startup view. Startup and Home must remain provider-free: do not preload, ping, navigate, or create a service WebView merely to render Home.
+- Show the lightweight branded splash promptly for at least three seconds and longer when startup is not ready. The splash itself must not initialize WebView2 or contact a provider.
+- An explicitly saved **Last service** startup preference may launch that service only after the shell is ready. Never infer or silently create a startup service.
+- VPN Location always starts **Direct** and never reconnects a prior location automatically, including when Last service is enabled.
+- Create one service WebView2 after the first actual service launch, then reuse that exact WebView and the shared profile at `Data/Browser/Shared` for all services.
+- Home, Services, and Settings hide the active browser without destroying its session. Home must mute and hide it immediately, render without awaiting browser work, and attempt suspension only after the controller is invisible.
+- On Home, pause standard finite-duration HTML media and resume only media Monkey TV paused when the same service returns. If standard APIs clearly identify a live stream, keep it running but muted. For inaccessible/custom players, retain safe mute/hide and best-effort suspension; never claim perfect live-stream detection.
+- Reopening the same service resumes the existing page when no forced reload is pending. Opening a different service reuses the same WebView, applies that service's browser identity, and navigates while hidden/muted until ready.
+- Never create one persistent browser per service. Permit at most one temporary same-profile child WebView for a user-initiated related/auth popup. Route clearly unrelated user-initiated popup links to the Windows default browser.
+- User-agent/experience settings are per service. Never globally spoof a provider user agent. Keep browser zoom at its normal default and do not add per-service zoom.
+
+## Services and organization
+
+- The top-level Services view is the complete searchable service library and management surface. Home is the artwork-first launcher.
+- Preserve configured-service identity, order, sorting choices, Favorites, hidden-from-Home state, artwork, banner fit, Default/TV Experience, advanced custom user agent, and custom-service data.
+- Favoriting a service does not remove it from the configured library. Hidden services remain configured and manageable in Services.
+- Edit Service uses the integrated drawer and supports unsaved preview/testing without silently persisting draft values. Save must preserve unrelated organization fields; Cancel must discard the draft.
+- `PreferredVpnLocation` is optional per-service metadata with values None, Direct, USA, Canada, or United Kingdom. Missing/legacy values deserialize as None. Never guess a service's preferred country.
+- A preferred location is a launch-time suggestion only. Editing or saving it performs no connection, download, preparation, verification, containment, or other live network work.
+- On actual service launch, if the preference does not match the active verified route, offer **Switch & Open**, **Open Anyway**, and **Cancel**. Switch & Open must use the existing verified VPN routing flow and must not navigate the service unless the requested route becomes ready. Failure leaves the service unopened and never silently falls back.
+- Home, Services, Settings, and editing a service must not trigger preferred-location checks; only an actual service launch does.
+
+## VPN Location
+
+- Present one user-facing **VPN Location** feature through the persistent top-bar drawer: Direct, USA, Canada, and United Kingdom. Keep legacy backend names and technical routing terminology out of normal UI.
+- Preserve the current unified routing implementation:
+  - Direct uses the normal connection through Monkey TV's loopback gateway.
+  - USA retains the documented Nord SOCKS5 automatic/city choices.
+  - Canada and United Kingdom use official downloaded Nord OpenVPN configurations through the existing OpenVPN 3 Core/lwIP user-space helper.
+  - Canada/UK containment requires Monkey TV's complete app-owned Fixed Version WebView2 runtime and the existing scoped user-mode WFP broker.
+- Use only official/supplied Nord configurations and documented endpoints. Do not fabricate locations, infer cities from numbered hosts, use private APIs, reverse-engineer Nord software, or weaken TLS/certificate verification.
+- Nord manual/service credentials are shared by the routing backends and protected with Windows DPAPI. Never log, export, place on command lines, or persist them as plaintext.
+- Route changes must be serialized and fail closed. Block/hide active service traffic before connecting, switching, disconnecting, or retrying; verify the intended egress before reporting Connected/Direct or navigating/reloading a service.
+- If a route, helper, containment policy, or verification fails or disappears, keep the gateway denied and report failure. Never silently fall back to Direct or an unintended country.
+- Preserve automatic bounded candidate fallback and clean each failed attempt before trying another candidate.
+- VPN Location affects only Monkey TV browser traffic. Do not create a system-wide VPN route, system VPN profile, TAP/Wintun/DCO adapter, custom kernel driver/callout, permanent service, or persistent organization-management policy. Unrelated applications and unrelated WebView2 runtimes must remain unaffected.
+- Preserve the scoped WFP application identity and Fixed Runtime boundary for Canada/UK. Do not substitute shared Evergreen WebView2 for a route that requires proven per-application containment.
+- Returning Home or navigating within the shell preserves an active verified route. Application shutdown must tear down helper processes, gateway state, and scoped containment cleanly.
+
+## Website permissions and browser safety
+
+- Camera, microphone, geolocation, and clipboard-read permissions behave like browser permissions keyed by exact normalized origin and permission type.
+- The first supported request from an origin asks the user. Persist an explicit Allow or Deny decision across restarts and reuse it automatically for that exact origin/type. Never grant an unrecorded permission automatically.
+- Coalesce duplicate simultaneous requests so one origin cannot create multiple identical prompts. Related same-profile popup WebViews reuse the same applicable decision.
+- Store permission decisions only as bounded portable site-permission data under Monkey TV's active `Data` root. Do not include them in configuration exports.
+- Reset Service or clearing applicable site data clears permission decisions for that service's known origins. Reset All Website Data clears every saved website permission decision.
+- Notifications and unsupported privileged permissions remain denied unless a future explicitly approved feature provides a conservative implementation.
+- Popup handling, permissions, and downloads must remain conservative. Do not inject Monkey TV themes or unrelated scripts into provider pages.
+
+## Portable data, storage, and privacy
+
+- Monkey TV's default writable root is `Data` beside the executable. A user may explicitly relocate ordinary user data through Settings; do not silently write app data to AppData, LocalAppData, Documents, the registry, or machine-specific source paths.
+- Framework/OS-managed single-file extraction and Windows security facilities are not Monkey TV user-data locations.
+- `Data/Requirements` beside the executable is application/runtime infrastructure, not ordinary user data. Preserve it, never relocate it with user data, exclude it recursively from normal user-facing storage totals, and never delete or modify it during cleanup/reset.
+- Keep the app-owned Fixed WebView2 runtime as a complete matched set. Do not prune individual files from `Runtime/WebView2Fixed` or `Data/Requirements/WebView2Fixed` to reduce size.
+- Keep persistent Data size-conscious and bounded. Logs, diagnostics, recovery files, metadata, caches, temporary downloads, and migration queues must not grow without a limit. Never log passwords, usernames, tokens, public IP addresses, private certificate material, credential-bearing configuration, or browser-profile secrets.
+- Preserve cookies, Network state, Local Storage, IndexedDB, Cache Storage, service workers, legitimate provider/DRM state, and user preferences by default. Automatic cleanup may target only verified disposable browser/cache/runtime artifacts.
+- The shared browser temporary-data soft target is 100 MiB. Use supported WebView2 disk-cache cleanup; do not use undocumented production Chromium cache flags.
+- Configuration export/import remains bounded and path-safe. Exports exclude browser profiles, cookies, credentials, permissions, authentication/DRM state, caches, logs, and runtime Requirements by default.
+- Preserve `FutureSettings`, legacy fields needed for safe migration, stable service IDs, and unknown forward-compatible configuration where applicable. Never copy/merge cookies, credentials, or DRM state between legacy profiles during migration.
+- Removed legacy shared-profile data may be queued only in a small bounded file and deleted at a safe point when no active WebView uses that UDF.
+
+## Reset behavior
+
+- Reuse one underlying service-data reset implementation.
+- Browser controls → Reset Service resets the active service and immediately reloads/reopens it.
+- Edit Service → Reset Service resets the selected service while leaving the drawer and originating view in place. Mark only that service for a fresh reload the next time it becomes active.
+- Resetting one service must not reload or disturb another service. Do not create WebView2 from Home merely to perform a reset; queue the safe work for the selected service's next activation when necessary.
+- Reset All Website Data clears the shared browser profile and all saved website permissions, without deleting configured services, application settings, artwork, VPN credentials/configuration, or `Data/Requirements`.
+- Reset Monkey TV removes ordinary Monkey TV user data but preserves `Data/Requirements`.
+
+## Appearance and accessibility
+
+- Support System, Light, and Dark themes and the current accent system across Monkey TV UI only. Never inject application appearance into provider pages.
+- Maintain readable contrast, keyboard focus, mouse/keyboard operation, and consistent control states across Home, Services, Settings, drawers, dialogs, menus, and first-run/recovery UI.
+- Animations must be subtle, fast, and lightweight. Respect the effective Reduced Motion preference: replace movement/scale with instant changes or very short fades without changing behavior.
+- Persist only validated appearance and normal/maximized placement state. Do not persist transient drawer, fullscreen, loading, or VPN-connection state.
+
+## Build, testing, and handoff
+
+- Release builds are self-contained, single-file, x64. VPN-enabled test/final layouts also require the checked-in matched runtime dependencies copied beneath `Data/Requirements`.
+- Before handing off a test build: build Release with zero errors, run the smoke tests and directly relevant regression tests, publish to a temporary directory, replace the intended test executable, and remove generated `bin`, `obj`, and temporary publish output.
+- For meaningful browser/UI changes, test clean setup, startup, Home, Services, Settings, resizing, keyboard focus, a benign service, shared-profile resume/switching, popup/download/permission paths, F11/Escape, shutdown/restart, and portable paths as applicable.
+- For VPN changes, test Direct and affected countries, route-before-navigation, verification, switching, route loss/fail-closed behavior, unrelated-process isolation, and cleanup. Do not claim a provider/DRM/location flow works without manual account testing.
+- Keep `CHANGELOG.md`, current architecture/build documentation, known limitations, and third-party notices accurate for every handed-off build.
+- Local test builds belong in `builds/Test Build`. Keep only deliberate milestone/final artifacts under top-level `builds`; do not accumulate intermediate outputs.
+- Never place existing user Data, credentials, browser profiles, cookies, logs, downloaded private state, or test artifacts in a distributable. A clean distributable may contain an empty writable Data layout plus required runtime infrastructure beneath `Data/Requirements`.
 
 ## Publishing authorization
 
-- Building, running, debugging, and testing locally is allowed during development.
-- Publishing, pushing, uploading, packaging a distributable, or creating/updating a release requires explicit user instruction for that specific development state.
-- Do not automatically publish after every development prompt. Multiple development prompts may be completed before the user requests a new test or release build.
-- Keep `CHANGELOG.md` current for every build. GitHub release notes should be a short plain-English summary with a clear link to the detailed changelog.
-
-## Final build location
-
-- Put user-facing final build artifacts in the repository's top-level `builds/` folder.
-- Keep only milestone/final distributables there, not intermediate build or publish output.
-- Hand off every final distributable as a private, one-click downloadable file link in the user's chat/session.
-- Do not publish Monkey TV builds publicly. Use a private host only if a future environment requires hosting.
-- Use the final artifact in `builds/` as the source for the private download link.
-- The chosen private host is the GitHub repository `realmcmonkey/monkey-tv-builds`. For every explicitly authorized Monkey TV release push, create one private GitHub prerelease whose tag contains the alpha version and build number (for example, `v0.0.2-alpha-build1`).
-- Attach the final single-file `MonkeyTV.exe` directly to that GitHub Release so the user can download it from GitHub. A clean portable ZIP may be attached as an additional convenience artifact, but it must not replace the EXE attachment.
-- Return the authenticated HTTPS asset-download URL as the primary link. The user must be signed in to the authorized GitHub account.
-- Never upload intermediate/debug builds, test profiles, cookies, credentials, or non-final artifacts.
+- Local editing, building, debugging, smoke testing, and updating the specifically requested local test executable are allowed during development.
+- Committing, pushing, tagging, packaging a distributable, uploading, publishing, or creating/updating a release requires explicit user authorization for that exact current development state.
+- Do not automatically release after development work. Never publish Monkey TV publicly.
+- When a release is explicitly authorized, use the private GitHub repository `realmcmonkey/monkey-tv-builds`, create the requested private prerelease/tag, attach the final single-file `MonkeyTV.exe` directly, and optionally attach a clean portable ZIP. Return the authenticated asset URL and keep release notes concise with a link to the detailed changelog.

@@ -1,0 +1,50 @@
+MONKEY TV MAIN-PC DEVELOPMENT TRANSFER
+=======================================
+
+Created: 2026-08-21
+Development target: v0.06-alpha Build #1 (unreleased working state)
+
+INCLUDED
+--------
+- Complete current repository worktree, including tracked and untracked source.
+- .git metadata, local history, branches, index, and current worktree status.
+- Monkey TV source, AGENTS.md, README, changelog, docs, tests, tools, and research notes.
+- Maintained native helper source with pinned OpenVPN 3 Core/lwIP vendors and licenses.
+- Runtime/VpnV2 shipped helper and required native DLLs.
+- Complete ignored Runtime/WebView2Fixed matched runtime set.
+
+INTENTIONALLY EXCLUDED
+----------------------
+- builds/Test Build and all of its live/personal Data.
+- Generated bin, obj, native out/build, temporary publish, and artifact directories.
+- Personal browser profiles, cookies, provider logins, DRM/provider state, Nord DPAPI
+  credentials, site credentials, personal logs, caches, crash artifacts, and temporary files.
+
+MACHINE-BOUND STATE
+-------------------
+Nord credentials protected with Windows DPAPI may need to be entered again. Provider/browser
+sign-ins and DRM state may not transfer safely between Windows PCs. Do not weaken those
+protections; use a clean adjacent Data folder and sign in again where necessary.
+
+FIRST CHECKS ON THE MAIN PC
+---------------------------
+From the extracted repository root, run:
+
+  git status --short
+  dotnet --info
+  dotnet restore .\MonkeyTV\MonkeyTV.csproj
+  dotnet build .\MonkeyTV\MonkeyTV.csproj -c Release --no-restore
+  dotnet run --project .\tests\MonkeyTV.SmokeTests\MonkeyTV.SmokeTests.csproj -c Release
+
+Also verify:
+
+  Runtime\WebView2Fixed\msedgewebview2.exe
+  Runtime\VpnV2\MonkeyTV.UserSpaceOpenVpnProof.exe
+  Runtime\VpnV2\libcrypto-3-x64.dll
+  Runtime\VpnV2\libssl-3-x64.dll
+  Runtime\VpnV2\lz4.dll
+
+Normal Monkey TV development requires Windows 11 x64, Git, the .NET 8 SDK, and NuGet access.
+Only native-helper rebuilding additionally requires MSVC x64 Build Tools, CMake 3.25+, Ninja,
+and a bootstrapped vcpkg checkout configured as described in
+native\MonkeyTV.UserSpaceOpenVpnHelper\README.md.

@@ -1,33 +1,27 @@
-# Known limitations — v0.05-alpha
+# Known limitations
 
-- Built-in artwork matching is conservative and based on configured service name/domain. Unusual names or URLs may require manual selection from the artwork picker.
+## Streaming providers
 
-- Streaming providers, logins, audio/video, subtitles, DRM, and provider fullscreen have not been account-tested. Provider policy may block embedded browsers even when Edge itself works. No bypass will be attempted.
-- The complete V2 release archive uses a separately packaged Microsoft Fixed Version WebView2 Runtime for its app-only process identity. It is large by design and must be updated in future releases; do not remove individual runtime files.
-- VPN Location V2 is an opt-in experiment. It can download official Nord UDP configurations for USA, Canada, and United Kingdom; provider login, DRM, streaming playback, sustained parallel WebView traffic, tunnel recovery, and long-duration packet-level containment still require hands-on testing. Current Location v1 remains the default.
-- Browser controls use a small auto-hiding owned flyout because same-window WPF content cannot safely overlay the standard WebView2 HWND. The composition alternative remains unsuitable because DRM-protected content can fail.
-- Automatic icons are best effort. Some sites block requests, omit icon metadata, return unsupported formats, or require JavaScript; manual replacement is available.
-- Automatic banner discovery is best effort and currently uses suitable Open Graph/Twitter landscape images exposed in initial HTML. Sites may provide marketing/content art instead of a clean logo, omit metadata, require JavaScript, or block the request; manual banner replacement is available.
-- User-initiated related/auth new-window requests use one temporary child WebView sharing the main profile; one child is allowed at a time and it is never a permanent tab. Unrelated user-initiated popup links open in the Windows default browser. Generic domain/auth heuristics cannot identify every provider flow, so unusual legitimate flows can still require the default browser or fail.
-- DevTools are disabled; the normal website context menu is enabled in this testing alpha.
-- Cursor auto-hide is based on service-view inactivity rather than video-playback detection. It is best effort and can vary while the HWND-hosted site has mouse capture or controls its own cursor.
-- Multi-monitor fullscreen uses the monitor containing Monkey TV and restores the prior bounds, but unusual mixed-DPI/display-topology changes made while fullscreen still need broader hardware testing.
-- Home immediately mutes and hides the WebView, then uses WebView2's supported best-effort process suspension to preserve same-service page state. Silence is enforced while Home is visible, but the runtime may decline full renderer suspension for a busy page; that case is logged and the hidden page remains muted. A website or runtime may still pause, reload, or alter playback state according to its own behavior.
-- TV Experience only requests a TV-oriented interface with a centralized smart-TV browser identity. Services may ignore it, return their normal interface, or reject the embedded environment.
-- The active browser profile is shared. WebView2 does not expose reliable origin-specific cleanup for every storage class, so per-service site-data clearing is unavailable rather than risking unrelated providers. The Home context menu clears only safe shared temporary cache.
-- Navigation failures and WebView process failures use a Monkey TV error state when WebView2 reports them. Provider-rendered HTTP error pages or failures hidden inside site scripts cannot always be distinguished reliably.
-- Per-service storage is not shown because all services share one WebView2 profile and origin-by-origin filesystem attribution would be guesswork.
-- Storage categories are intentionally broad. WebView2 does not expose a reliable filesystem-level accounting API for every individual origin, so Monkey TV does not invent per-domain numbers. Shared-UDF runtime resources are reported as browser persistent/temporary data rather than assigned to a service.
-- Persistent cookies, IndexedDB, DRM state, and other provider-owned site data can still grow. Monkey TV removes known disposable caches but does not impose destructive quotas that could break login or playback.
-- Live/on-demand detection uses standard HTML media state. Providers using inaccessible cross-origin frames, closed shadow DOM, or custom/protected player internals may not expose enough information; those pages are muted and use WebView2's best-effort suspension fallback. A provider may also reject automatic `play()` on resume under its own autoplay policy.
-- Existing v0.0.1 and Build #1 profiles are retained rather than being manually merged into the unified profile. Their sessions are preserved on disk but are not used by Build #2, so providers can require a one-time login again. Retained data can remain until the service is removed or browser data is cleared.
-- The 100 MiB temporary-cache target is not a strict Chromium quota. A live website can exceed it between five-minute checks during navigation or streaming. Monkey TV clears supported disk cache when the target is exceeded or before switching to a different service, and performs broader filesystem cleanup once WebView2 is closed. Returning Home or resuming the same service does not clear it.
-- Monkey TV does not act as a download manager. Website-initiated downloads use a Windows Save dialog outside Monkey TV's managed `Data` folder; canceling leaves no app-owned download artifact.
-- Camera, microphone, location, and clipboard decisions are prompted per request and are not persisted by Monkey TV. Notifications and unsupported privileged requests are denied. Real providers may require additional permission behavior that still needs manual testing.
-- Configuration backup restores launcher settings and artwork only. It intentionally does not restore streaming-service logins.
-- App-controlled paths are portable, but .NET single-file native extraction and the installed WebView2 Runtime use operating-system locations outside `Data`.
-- Portable profiles may include machine-bound authentication/DRM data and can require reauthentication after copying PCs.
-- There is no startup PIN, controller support, automatic updater, installer, crash-report submission, or provider-specific integration in this alpha. Update checking currently has architecture only and makes no network request.
-# Current Location
+- Provider login, catalogue availability, playback, subtitles, protected media, and fullscreen remain provider-controlled and need hands-on testing with the user’s own accounts.
+- A provider can reject an embedded browser even when it works in normal Edge. Monkey TV will not bypass that decision.
+- Website popups, permissions, and downloads are intentionally conservative. Related/auth popups are limited; unrelated links can open in the Windows default browser.
 
-Current Location routes Monkey TV browser traffic through Direct mode or a limited set of NordVPN documented SOCKS5 locations. It is not a system-wide VPN and does not protect other Windows applications. Nord currently does not document SOCKS5 endpoints for every country, automatic recommended proxy selection, or general city discovery; Monkey TV therefore does not offer arbitrary countries such as Canada or the United Kingdom. WebRTC/UDP protection is best effort, not a zero-leak guarantee.
+## VPN Location
+
+- VPN Location changes only Monkey TV’s browser traffic. It is not a system-wide VPN and does not protect other Windows applications.
+- Direct is always the startup state. A selected location is never reconnected automatically at launch.
+- Location availability, exit-country detection, provider geo-catalog behavior, and playback must be confirmed manually. A location result does not guarantee a provider will offer different content.
+- Connection failures should be treated as failures; Monkey TV must not claim a selected location is ready until its route verification succeeds.
+
+## Browser and storage
+
+- One WebView2 profile is shared between services. Monkey TV cannot safely promise complete origin-by-origin storage cleanup without risking other services’ data.
+- Home mutes and hides the active service and uses WebView2’s best-effort suspension. Some provider pages can still pause, reload, or change playback according to their own rules.
+- Portable browser profiles can contain machine-bound sign-in and DRM data; copying a build to another PC can require signing in again.
+- Automatic artwork and icon discovery are best effort. Manual artwork selection remains available.
+
+## Platform
+
+- Monkey TV targets Windows 11 x64.
+- The Fixed Version WebView2 runtime used by the current VPN Location-enabled test build is large and must remain a complete matched set. Do not remove individual files to reduce size.
+- .NET single-file support can use operating-system extraction paths internally; Monkey TV’s own writable data remains under `Data`.

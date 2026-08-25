@@ -41,6 +41,31 @@ public static class StorageService
         catch { return 0; }
     }
 
+    /// <summary>
+    /// Measures portable user/runtime data without rolling the separately bundled runtime packs
+    /// beneath Data\Requirements into the user-facing storage total.
+    /// </summary>
+    public static long UserDataSize() => UserDataSize(PortablePaths.DataRoot);
+
+    internal static long UserDataSize(string dataRoot)
+    {
+        if (!Directory.Exists(dataRoot)) return 0;
+        long total = 0;
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(dataRoot, "*", SearchOption.TopDirectoryOnly))
+                total += SafeFileLength(file);
+            foreach (var directory in Directory.EnumerateDirectories(dataRoot, "*", SearchOption.TopDirectoryOnly))
+            {
+                if (string.Equals(Path.GetFileName(directory), "Requirements", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                total += DirectorySize(directory);
+            }
+        }
+        catch { }
+        return total;
+    }
+
     // Build #2 shares one WebView2 profile. Per-service values would be invented, so none are reported.
     public static IReadOnlyList<ServiceStorage> MeasureServices(IEnumerable<ServiceDefinition> services) => Array.Empty<ServiceStorage>();
 
@@ -53,7 +78,7 @@ public static class StorageService
         var temporary = GetTemporaryBrowserBytes() + DirectorySize(PortablePaths.CacheDirectory);
         temporary = Math.Min(browser + DirectorySize(PortablePaths.CacheDirectory), temporary);
         var persistent = Math.Max(0, browser - Math.Min(browser, GetTemporaryBrowserBytes()));
-        var total = DirectorySize(PortablePaths.DataRoot);
+        var total = UserDataSize();
         var other = Math.Max(0, total - settings - artwork - logs - browser - DirectorySize(PortablePaths.CacheDirectory));
         return new(settings, artwork, persistent, temporary, logs, other, total);
     }
@@ -92,6 +117,10 @@ public static class StorageService
         ClearDirectoryContents(PortablePaths.CacheDirectory);
         TryDelete(Path.Combine(PortablePaths.DataRoot, "startup-error.txt"));
     }
+
+    // Normal shutdown uses the broadest verified safe set, including replaceable runtime-delivered
+    // components. This must run only after the shared WebView has been disposed.
+    internal static void ClearShutdownTemporaryData() => ClearAllTemporaryData(includeReplaceableComponents: true);
 
     public static async Task ClearActiveDiskCacheAsync(CoreWebView2Profile? profile)
     {
@@ -150,18 +179,10 @@ public static class StorageService
     {
         if (Directory.Exists(PortablePaths.DataRoot))
         {
-            var preserveRequirements = string.Equals(
-                Path.GetFullPath(PortablePaths.DataRoot).TrimEnd(Path.DirectorySeparatorChar),
-                Path.GetFullPath(PortablePaths.DefaultDataRoot).TrimEnd(Path.DirectorySeparatorChar),
-                StringComparison.OrdinalIgnoreCase);
-            if (preserveRequirements)
-            {
-                foreach (var file in Directory.EnumerateFiles(PortablePaths.DataRoot)) File.Delete(file);
-                foreach (var directory in Directory.EnumerateDirectories(PortablePaths.DataRoot))
-                    if (!string.Equals(Path.GetFileName(directory), "Requirements", StringComparison.OrdinalIgnoreCase))
-                        Directory.Delete(directory, true);
-            }
-            else Directory.Delete(PortablePaths.DataRoot, true);
+            foreach (var file in Directory.EnumerateFiles(PortablePaths.DataRoot)) File.Delete(file);
+            foreach (var directory in Directory.EnumerateDirectories(PortablePaths.DataRoot))
+                if (!string.Equals(Path.GetFileName(directory), "Requirements", StringComparison.OrdinalIgnoreCase))
+                    Directory.Delete(directory, true);
         }
         PortablePaths.EnsureCreated();
     }

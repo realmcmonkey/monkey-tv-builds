@@ -75,7 +75,7 @@ internal sealed class VpnV2WfpBroker : IAsyncDisposable
         string executable;
         try { executable = Encoding.UTF8.GetString(Convert.FromBase64String(pathArg[(pathArg.IndexOf('=') + 1)..])); }
         catch { return true; }
-        MonkeyTV.VpnProxyProof.WfpContainmentSpike? containment = null;
+        WfpContainmentPolicy? containment = null;
         try
         {
             using var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
@@ -89,7 +89,7 @@ internal sealed class VpnV2WfpBroker : IAsyncDisposable
                 try
                 {
                     if (command == "ENABLE")
-                        containment ??= MonkeyTV.VpnProxyProof.WfpContainmentSpike.InstallMinimalIPv4Block(executable, _ => { }, completePolicy: true);
+                        containment ??= WfpContainmentPolicy.InstallMinimalIPv4Block(executable, _ => { }, completePolicy: true);
                     else if (command == "DISABLE") { containment?.Dispose(); containment = null; }
                     else if (command == "STOP") { containment?.Dispose(); containment = null; await writer.WriteLineAsync("OK"); break; }
                     else throw new InvalidOperationException("Unknown containment command.");

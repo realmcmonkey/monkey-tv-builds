@@ -17,7 +17,6 @@ public static partial class VpnV2LocationCatalog
     private static readonly Uri OfficialArchiveUri = new("https://downloads.nordcdn.com/configs/archives/servers/ovpn.zip");
     public static IReadOnlyList<VpnV2CountryDownload> All { get; } =
     [
-        new("United States", "us"),
         new("Canada", "ca"),
         new("United Kingdom", "uk")
     ];
@@ -82,6 +81,6 @@ public static partial class VpnV2LocationCatalog
         }
     }
 
-    [GeneratedRegex(@"^(?:us|ca|uk)\d+\.nordvpn\.com\.udp\.ovpn$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^(?:ca|uk)\d+\.nordvpn\.com\.udp\.ovpn$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex CountryFileName();
 }

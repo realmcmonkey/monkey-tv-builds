@@ -1,0 +1,16 @@
+<Window x:Class="MonkeyTV.PreferredVpnLaunchWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="VPN Location" Width="580" Height="390" WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize" WindowStyle="None" AllowsTransparency="True" Background="Transparent">
+  <Border x:Name="DialogSurface" Background="{DynamicResource SurfaceBrush}" CornerRadius="18" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="32" Opacity="0" RenderTransformOrigin="0.5,0.5">
+    <Border.RenderTransform><ScaleTransform x:Name="DialogScale" ScaleX=".985" ScaleY=".985"/></Border.RenderTransform>
+    <Border.Effect><DropShadowEffect Color="Black" BlurRadius="28" ShadowDepth="8" Opacity=".32"/></Border.Effect>
+    <Grid>
+      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <StackPanel><Border Background="{DynamicResource AccentSubtleBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="8" Padding="9,5" HorizontalAlignment="Left"><TextBlock Text="VPN LOCATION" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"/></Border><TextBlock x:Name="Heading" FontSize="25" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,17,0,0"/><TextBlock Text="Choose how Monkey TV should open this service." Foreground="{DynamicResource MutedBrush}" FontSize="17" LineHeight="23" Margin="0,8,0,0"/></StackPanel>
+      <Border Grid.Row="1" Background="{DynamicResource SubtleSurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="17" Margin="0,20,0,22"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="1"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Preferred location" Foreground="{DynamicResource MutedBrush}" FontSize="13"/><TextBlock x:Name="PreferredLocationText" FontSize="17" FontWeight="SemiBold" Margin="0,4,0,0"/></StackPanel><TextBlock Grid.Column="1" Text="→" FontSize="20" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/></Grid><Border Grid.Row="1" Height="1" Background="{DynamicResource BorderBrush}" Margin="0,15"/><StackPanel Grid.Row="2"><TextBlock Text="Current location" Foreground="{DynamicResource MutedBrush}" FontSize="13"/><TextBlock x:Name="CurrentLocationText" FontSize="17" FontWeight="SemiBold" Margin="0,4,0,0"/></StackPanel></Grid></Border>
+      <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="Cancel" Click="Cancel_Click" Margin="0,0,10,0" MinWidth="92"/><Button Content="Open Anyway" Click="OpenAnyway_Click" Margin="0,0,10,0" MinWidth="122"/><Button Content="Switch &amp; Open" Style="{StaticResource AccentButton}" Click="SwitchAndOpen_Click" MinWidth="142"/></StackPanel>
+    </Grid>
+  </Border>
+</Window>

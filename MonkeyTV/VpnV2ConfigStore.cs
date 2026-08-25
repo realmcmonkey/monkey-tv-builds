@@ -31,25 +31,18 @@ public static partial class VpnV2ConfigStore
     {
         var info = new FileInfo(source);
         if (!info.Exists || info.Length is < 64 or > 256 * 1024) throw new InvalidDataException("Choose an official Nord .ovpn configuration file.");
-        var match = OfficialCanadaName().Match(info.Name);
-        if (!match.Success || !match.Groups["server"].Value.Equals("ca1968", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException("This first experimental build accepts only the proven official ca1968 Nord Canada configuration.");
+        var match = OfficialCountryName().Match(info.Name);
+        if (!match.Success)
+            throw new InvalidDataException("Choose an official Nord Canada or United Kingdom UDP configuration.");
         var text = File.ReadAllText(source);
-        var required = new[] { "client", "dev tun", "remote-cert-tls server", "auth-user-pass", "<ca>", "</ca>", "<tls-auth>", "</tls-auth>" };
-        if (required.Any(value => !text.Contains(value, StringComparison.OrdinalIgnoreCase)) ||
-            !Regex.IsMatch(text, @"(?mi)^\s*proto\s+udp\s*$") ||
-            !Regex.IsMatch(text, @"(?mi)^\s*remote\s+187\.13\.240\.179\s+53\s*$"))
-            throw new InvalidDataException("The configuration does not match the Nord Canada profile proven by this experiment.");
-        var externalPathDirectives = new HashSet<string>(new[] { "auth-user-pass", "ca", "cert", "key", "pkcs12", "tls-auth" }, StringComparer.OrdinalIgnoreCase);
-        var externalReference = text.Split('\n').Select(line => line.Trim()).Where(line => line.Length > 0 && !line.StartsWith('#') && !line.StartsWith(';'))
-            .Select(line => line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
-            .FirstOrDefault(parts => parts.Length > 1 && externalPathDirectives.Contains(parts[0]));
-        if (externalReference is not null)
-            throw new InvalidDataException($"Only self-contained official configurations are accepted; '{externalReference[0]}' references an external file.");
+        ValidateSelfContainedConfiguration(text);
+        var prefix = match.Groups["prefix"].Value.ToLowerInvariant();
+        var country = prefix == "ca" ? "Canada" : "United Kingdom";
+        var serverName = match.Groups["server"].Value + ".nordvpn.com";
         PortablePaths.EnsureCreated();
         var existing = Load().ToList();
-        var prior = existing.FirstOrDefault(item => item.ServerName.Equals("ca1968.nordvpn.com", StringComparison.OrdinalIgnoreCase));
-        var item = prior ?? new VpnV2ImportedConfig(Guid.NewGuid(), "Canada", "ca1968.nordvpn.com", "UDP", Guid.NewGuid().ToString("N") + ".ovpn");
+        var prior = existing.FirstOrDefault(item => item.ServerName.Equals(serverName, StringComparison.OrdinalIgnoreCase));
+        var item = prior ?? new VpnV2ImportedConfig(Guid.NewGuid(), country, serverName, "UDP", Guid.NewGuid().ToString("N") + ".ovpn");
         File.Copy(source, item.FullPath, true);
         if (prior is null) existing.Add(item);
         Save(existing);
@@ -62,7 +55,7 @@ public static partial class VpnV2ConfigStore
             throw new InvalidDataException("No trusted country configurations were supplied.");
         foreach (var config in configs)
         {
-            if (!Regex.IsMatch(config.ServerName, @"^(?:us|ca|uk)\d+\.nordvpn\.com$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+            if (!Regex.IsMatch(config.ServerName, @"^(?:ca|uk)\d+\.nordvpn\.com$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
                 throw new InvalidDataException("Nord's archive contained an unexpected server name.");
             ValidateSelfContainedConfiguration(System.Text.Encoding.UTF8.GetString(config.Content));
         }
@@ -119,6 +112,6 @@ public static partial class VpnV2ConfigStore
         File.Move(temporary, PortablePaths.VpnV2IndexFile, true);
     }
 
-    [GeneratedRegex(@"^(?<server>ca\d+)\.nordvpn\.com\.udp_2\.6\.ovpn$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
-    private static partial Regex OfficialCanadaName();
+    [GeneratedRegex(@"^(?<server>(?<prefix>ca|uk)\d+)\.nordvpn\.com\.udp(?:_2\.6)?\.ovpn$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex OfficialCountryName();
 }

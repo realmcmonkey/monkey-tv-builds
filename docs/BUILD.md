@@ -1,14 +1,37 @@
-# Build and packaging
+# Build guide
 
-## Dependencies
+## Requirements
 
-- Windows 11 x64 development machine
-- .NET 8 SDK or newer
-- NuGet access for `Microsoft.Web.WebView2` 1.0.3537.50
-- Microsoft Edge WebView2 Evergreen Runtime for ordinary direct/V1 development and testing
-- For V2: a Microsoft Fixed Version WebView2 Runtime Pack at `Runtime/WebView2Fixed` and the tracked V2 helper files at `Runtime/VpnV2`
+- Windows 11 x64
+- Git
+- .NET 8 SDK
+- NuGet access for the first restore
+- The repository `Runtime` folder for the current VPN Location-enabled build:
+  - `Runtime/VpnV2`
+  - `Runtime/WebView2Fixed`
 
-No Windows-specific Visual Studio workload is required for command-line builds. Paths in the project are relative, so the source directory can be moved between PCs.
+The runtime files are intentionally separate from source code. They are copied into the local
+test build only when publishing with VPN Location dependencies enabled:
+
+```text
+Runtime/VpnV2/       shipped user-space helper and required native DLLs
+Runtime/WebView2Fixed/ app-owned Fixed Version WebView2 runtime
+```
+
+The maintained rebuild source for the shipped user-space helper is
+[`native/MonkeyTV.UserSpaceOpenVpnHelper`](../native/MonkeyTV.UserSpaceOpenVpnHelper).
+It contains Monkey TV's native helper source, pinned OpenVPN 3 Core and lwIP vendor inputs,
+CMake configuration, and licensing provenance. Its production CMake target deliberately emits
+the compatibility filename `MonkeyTV.UserSpaceOpenVpnProof.exe`; that file, together with its
+native dependencies, is the shipped runtime contract under `Runtime/VpnV2`.
+
+Historical VPN proof projects are documented under [`research`](../research/), not used for
+current production builds or helper rebuilds.
+
+Normal WPF/.NET development does not require a native compiler, CMake, Ninja, or vcpkg. Those
+tools are needed only when rebuilding the shipped user-space VPN helper. The canonical native
+prerequisites and portable vcpkg setup are documented in the
+[`native/MonkeyTV.UserSpaceOpenVpnHelper` README](../native/MonkeyTV.UserSpaceOpenVpnHelper/README.md).
 
 ## Build
 
@@ -17,31 +40,67 @@ dotnet restore .\MonkeyTV\MonkeyTV.csproj
 dotnet build .\MonkeyTV\MonkeyTV.csproj -c Release --no-restore
 ```
 
-## Publish
+## Publish a local test copy
+
+Publish to a temporary folder first, then replace only the executable in the existing test build. This preserves the user’s local `Data` folder.
 
 ```powershell
-dotnet publish .\MonkeyTV\MonkeyTV.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o .\artifacts\publish
+$publish = Join-Path $env:TEMP 'MonkeyTV-publish'
+dotnet publish .\MonkeyTV\MonkeyTV.csproj -c Release --no-restore -o $publish
+Copy-Item "$publish\MonkeyTV.exe" ".\builds\Test Build\MonkeyTV.exe" -Force
+Remove-Item $publish -Recurse -Force
 ```
 
-The project enables compressed single-file publishing and embeds managed/native app dependencies into `MonkeyTV.exe`. At runtime .NET may extract internal native support files into its operating-system-managed temporary extraction cache; these are not loose distribution files. The V2 release archive additionally contains the complete app-owned Fixed Version WebView2 Runtime beneath `Data/Requirements/WebView2Fixed` and the V2 helper beneath `Data/Requirements/VpnV2`.
+Close Monkey TV before replacing the executable. Windows will refuse to overwrite a running application.
 
-## Size trade-off
-
-The self-contained portable build intentionally includes the .NET 8 Windows Desktop runtime. The v0.0.3-alpha Build #1 local release measurement is 78,179,732 bytes (about 74.56 MiB); the majority is the .NET/WPF/Windows SDK runtime, not Monkey TV code or WebView2 (which relies on the installed Evergreen Runtime). WPF is not supported or recommended with .NET trimming, so trimming is not enabled.
-
-A local framework-dependent single-file experiment measured about 24.4 MiB, but requires the matching .NET 8 Windows Desktop Runtime on the target PC. It is not the default portable build because that extra prerequisite weakens copy-to-another-PC reliability. Do not change the default distribution model without explicit user approval.
-
-Create a fresh empty `Data` folder next to the published EXE, include README/testing notes, then ZIP that folder. Never copy a developer/test `Data` directory into a public package because profiles can contain cookies and tokens.
-
-Expected user-facing layout:
+## Output layout
 
 ```text
-Monkey TV/
-  MonkeyTV.exe
-  Data/
-    Requirements/
-      WebView2Fixed/
-      VpnV2/
+builds/
+  Test Build/
+    MonkeyTV.exe
+    Data/
+      Requirements/
+        VpnV2/
+        WebView2Fixed/
 ```
 
-Documentation files may accompany the alpha without affecting runtime portability.
+`Data` is user data. Do not package or share an existing `Data` folder: it can contain settings, credentials protected for the current Windows user, browser profiles, and website sign-ins.
+
+## Cleanup after a successful local build
+
+Keep source, `Runtime`, documentation, tests, Git history, and the one current `builds/Test Build` folder. Remove only generated output when it is no longer needed:
+
+```text
+MonkeyTV/bin/
+MonkeyTV/obj/
+tests/**/bin/
+tests/**/obj/
+temporary publish folders
+obsolete builds/
+```
+
+Never remove individual files from `Runtime/WebView2Fixed` or `Data/Requirements/WebView2Fixed`; WebView2 Fixed Version runtime files are a matched runtime set.
+
+## Move development to another PC
+
+1. Copy the complete current working tree, or commit the intended work and clone it. A fresh
+   clone does not include uncommitted or ignored files.
+2. Copy `Runtime/WebView2Fixed` separately, or reinstall the matching Fixed Runtime Pack with
+   `tools/Install-FixedRuntimePack.ps1`. This ignored local dependency is not stored in Git.
+3. Confirm the shipped helper and DLLs are present under `Runtime/VpnV2`.
+4. Install Git and the .NET 8 SDK, then confirm NuGet access.
+5. Run the restore and Release-build commands above.
+6. Run the smoke suite:
+
+   ```powershell
+   dotnet run --project .\tests\MonkeyTV.SmokeTests\MonkeyTV.SmokeTests.csproj -c Release
+   ```
+
+7. Configure MSVC, CMake, Ninja, and vcpkg only if native-helper development is required.
+8. Use a clean adjacent `Data` folder for development builds. Re-enter Nord credentials and
+   provider sign-ins as needed; DPAPI secrets and browser/DRM state may be machine-bound.
+
+Do not make development depend on transferring `builds/Test Build/Data`. `Data/Requirements`
+is runtime infrastructure, while the rest of that test-build Data tree may contain personal
+settings, credentials, cookies, sign-ins, and provider state.

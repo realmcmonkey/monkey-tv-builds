@@ -1,132 +1,103 @@
-<Window x:Class="MonkeyTV.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Monkey TV" Width="1280" Height="800" MinWidth="760" MinHeight="520"
-        WindowStartupLocation="CenterScreen" Background="{DynamicResource BackgroundBrush}" PreviewKeyDown="Window_KeyDown" PreviewMouseWheel="Window_PreviewMouseWheel" MouseMove="Window_MouseMove">
+<Window x:Class="MonkeyTV.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Monkey TV" Width="1280" Height="800" MinWidth="760" MinHeight="520" WindowStartupLocation="CenterScreen" Background="{DynamicResource BackgroundBrush}" PreviewKeyDown="Window_KeyDown" PreviewMouseWheel="Window_PreviewMouseWheel" MouseMove="Window_MouseMove">
   <Window.Resources>
-    <Style x:Key="ServiceCardButtonStyle" TargetType="Button">
-      <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-      <Setter Property="Background" Value="Transparent"/>
-      <Setter Property="BorderThickness" Value="0"/>
-      <Setter Property="Padding" Value="0"/>
-      <Setter Property="Cursor" Value="Hand"/>
-      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-      <Setter Property="VerticalContentAlignment" Value="Stretch"/>
-      <Setter Property="Template">
-        <Setter.Value>
-          <ControlTemplate TargetType="Button">
-            <Grid x:Name="CardRoot" Background="Transparent">
-              <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
-            </Grid>
-            <ControlTemplate.Triggers>
-              <Trigger Property="IsPressed" Value="True"><Setter TargetName="CardRoot" Property="Opacity" Value="0.86"/></Trigger>
-              <Trigger Property="IsEnabled" Value="False"><Setter TargetName="CardRoot" Property="Opacity" Value="0.45"/></Trigger>
-            </ControlTemplate.Triggers>
-          </ControlTemplate>
-        </Setter.Value>
-      </Setter>
-    </Style>
+    <Style x:Key="ServiceCardButtonStyle" TargetType="Button"><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Padding" Value="0"/><Setter Property="Cursor" Value="Hand"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="VerticalContentAlignment" Value="Stretch"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Grid x:Name="CardRoot"><ContentPresenter/></Grid><ControlTemplate.Triggers><Trigger Property="IsPressed" Value="True"><Setter TargetName="CardRoot" Property="Opacity" Value=".84"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
+    <Style x:Key="TopNavButton" TargetType="Button"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Padding" Value="19,11"/><Setter Property="Margin" Value="4,0"/><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="FontSize" Value="14"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="NavSurface" Background="{TemplateBinding Background}" CornerRadius="9" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="NavSurface" Property="Background" Value="{DynamicResource ControlHoverBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/></Trigger><Trigger Property="Tag" Value="Active"><Setter TargetName="NavSurface" Property="Background" Value="{DynamicResource AccentSubtleBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/></Trigger><Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="NavSurface" Property="Background" Value="{DynamicResource AccentSubtleBrush}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
+    <Style x:Key="SectionCard" TargetType="Border"><Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="18"/><Setter Property="Padding" Value="22"/></Style>
   </Window.Resources>
   <Grid x:Name="RootGrid">
-    <Grid x:Name="HomeView" ClipToBounds="True" Background="{DynamicResource BackgroundBrush}">
-      <Ellipse Width="760" Height="520" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-300,-300,0,0" IsHitTestVisible="False">
-        <Ellipse.Fill><RadialGradientBrush><GradientStop Color="#247C5CFC" Offset="0"/><GradientStop Color="#007C5CFC" Offset="1"/></RadialGradientBrush></Ellipse.Fill>
-      </Ellipse>
-      <Ellipse Width="620" Height="420" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-260,-260" IsHitTestVisible="False">
-        <Ellipse.Fill><RadialGradientBrush><GradientStop Color="#123A79A8" Offset="0"/><GradientStop Color="#003A79A8" Offset="1"/></RadialGradientBrush></Ellipse.Fill>
-      </Ellipse>
-      <Grid>
-        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-        <Grid x:Name="HomeHeader" Margin="46,30,46,20">
-          <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Border Width="42" Height="42" CornerRadius="13" Margin="0,0,15,0" Background="Black" ClipToBounds="True">
-              <Border.Effect><DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.28" Color="#FF6B4CE6"/></Border.Effect>
-              <Image Source="Assets/Brand/monkey-tv-logo.jpg" Stretch="UniformToFill"/>
-            </Border>
-            <StackPanel VerticalAlignment="Center">
-              <TextBlock Text="Monkey TV" FontSize="23" FontWeight="SemiBold"/>
-              <TextBlock Text="Your streaming services" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,2,0,0"/>
-            </StackPanel>
-          </StackPanel>
-          <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-            <Button x:Name="CurrentLocationButton" Padding="12,8" Background="{DynamicResource SurfaceBrush}" Click="CurrentLocation_Click" ToolTip="Choose the route used by Monkey TV websites" Margin="0,0,8,0">
-              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE774;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="0,1,7,0"/><TextBlock x:Name="CurrentLocationText" Text="Direct" FontSize="13"/></StackPanel>
-            </Button>
-            <TextBlock x:Name="ClockText" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,16,0"/>
-            <Button Width="38" Height="38" Padding="0" Background="{DynamicResource SurfaceBrush}" Click="Settings_Click" ToolTip="Settings" Margin="0,0,8,0">
-              <TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="16"/>
-            </Button>
-            <Button Width="38" Height="38" Padding="0" Background="{DynamicResource SurfaceBrush}" Click="Fullscreen_Click" ToolTip="Toggle fullscreen (F11)">
-              <TextBlock Text="&#xE740;" FontFamily="Segoe MDL2 Assets" FontSize="15"/>
-            </Button>
-          </StackPanel>
-        </Grid>
-        <ScrollViewer x:Name="HomeScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="46,8,34,42" SizeChanged="HomeScroll_SizeChanged">
+    <Grid x:Name="HomeView" Background="{DynamicResource BackgroundBrush}">
+      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+      <Border x:Name="HomeHeader" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="34,16"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Panel.ZIndex="2"><Border Width="42" Height="42" Margin="0,0,12,0"><Image Source="Assets/Brand/monkey-tv-logo.png" Stretch="Uniform"/></Border><TextBlock Text="Monkey TV" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center"/></StackPanel>
+        <StackPanel Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalAlignment="Center" Panel.ZIndex="1"><Button x:Name="HomeNavButton" Tag="Active" Content="Home" Style="{StaticResource TopNavButton}" Click="HomeNav_Click"/><Button x:Name="ServicesNavButton" Content="Services" Style="{StaticResource TopNavButton}" Click="ServicesNav_Click"/><Button x:Name="SettingsNavButton" Content="Settings" Style="{StaticResource TopNavButton}" Click="SettingsNav_Click"/></StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Panel.ZIndex="2"><Button x:Name="CurrentLocationButton" Padding="12,8" Background="{DynamicResource ControlBrush}" Click="CurrentLocation_Click" ToolTip="Choose VPN Location" Margin="0,0,10,0"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE774;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="0,1,7,0"/><TextBlock x:Name="CurrentLocationText" Text="VPN Location: Direct" FontSize="13"/></StackPanel></Button><TextBlock x:Name="ClockText" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0"/><Button x:Name="FullscreenButton" Width="38" Height="38" Padding="0" Background="{DynamicResource ControlBrush}" Click="Fullscreen_Click" ToolTip="Enter fullscreen (F11)"><TextBlock x:Name="FullscreenGlyph" Text="&#xE740;" FontFamily="Segoe MDL2 Assets" FontSize="15"/></Button></StackPanel>
+      </Grid></Border>
+      <Grid Grid.Row="1">
+        <ScrollViewer x:Name="HomeScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="24,22,24,34" SizeChanged="HomeScroll_SizeChanged"><StackPanel x:Name="HomeContent">
+          <StackPanel x:Name="FavoritesSection" Visibility="Collapsed" Margin="0,0,0,30"><TextBlock Text="Favorites" FontSize="32" FontWeight="SemiBold" Margin="0,0,0,18"/><StackPanel x:Name="FavoritesPanel"/></StackPanel>
+          <StackPanel x:Name="AllServicesSection"><Grid Margin="0,0,0,14"><TextBlock Text="Other Services" FontSize="32" FontWeight="SemiBold"/><Button Grid.Column="1" Style="{StaticResource AccentButton}" Content="View all services" Click="ServicesNav_Click" HorizontalAlignment="Right" Padding="19,11" FontSize="14"/></Grid><Grid HorizontalAlignment="Center"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Button x:Name="OtherServicesPreviousButton" Grid.Column="0" Content="‹" Click="OtherServicesPrevious_Click" VerticalAlignment="Center" Width="54" Height="68" Margin="0,0,12,0" Background="{DynamicResource AccentSubtleBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" FontSize="30" FontWeight="SemiBold"/><ScrollViewer x:Name="OtherServicesScroll" Grid.Column="1" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" CanContentScroll="False" Focusable="True" PreviewKeyDown="OtherServicesScroll_PreviewKeyDown" ScrollChanged="OtherServicesScroll_ScrollChanged"><StackPanel x:Name="AllServicesPanel" Orientation="Horizontal" Margin="0,14,0,14" AllowDrop="True" DragOver="ServicesPanel_DragOver" Drop="ServicesPanel_Drop" DragLeave="ServicesPanel_DragLeave"/></ScrollViewer><Button x:Name="OtherServicesNextButton" Grid.Column="2" Content="›" Click="OtherServicesNext_Click" VerticalAlignment="Center" Width="54" Height="68" Margin="12,0,0,0" Background="{DynamicResource AccentSubtleBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" FontSize="30" FontWeight="SemiBold"/></Grid></StackPanel>
+          <Border x:Name="EmptyState" Style="{StaticResource SectionCard}" Visibility="Collapsed" MaxWidth="520" HorizontalAlignment="Center" Margin="0,70,0,0"><StackPanel><TextBlock Text="Build your streaming home" FontSize="25" FontWeight="SemiBold" HorizontalAlignment="Center"/><TextBlock Text="Choose services you use, then arrange them your way." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" TextAlignment="Center" Margin="0,10,0,22"/><StackPanel Orientation="Horizontal" HorizontalAlignment="Center"><Button Style="{StaticResource AccentButton}" Content="Browse services" Click="ServicesNav_Click" Margin="0,0,10,0"/><Button Content="Add custom service" Click="AddService_Click"/></StackPanel></StackPanel></Border>
+        </StackPanel></ScrollViewer>
+        <ScrollViewer x:Name="ServicesPrototypeView" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Padding="48,38,48,56">
           <StackPanel>
-            <StackPanel Margin="0,4,12,26">
-              <TextBlock Text="Your services" FontSize="28" FontWeight="SemiBold"/>
-              <TextBlock x:Name="ServicesSummaryText" Foreground="{StaticResource MutedBrush}" FontSize="13" Margin="0,5,0,0"/>
-            </StackPanel>
-            <WrapPanel x:Name="ServicesPanel" HorizontalAlignment="Left" AllowDrop="True" DragOver="ServicesPanel_DragOver" Drop="ServicesPanel_Drop" DragLeave="ServicesPanel_DragLeave"/>
-            <Button x:Name="AddManageServicesButton" Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="16,10" HorizontalAlignment="Left" Click="AddManageServices_Click" Margin="2,0,0,28" ToolTip="Add or manage services">
-              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="14" Margin="0,1,8,0"/><TextBlock Text="Add / Manage Services" FontWeight="SemiBold"/></StackPanel>
-            </Button>
-            <Border x:Name="EmptyState" Visibility="Collapsed" Background="{DynamicResource SubtleSurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="18" Padding="38" MaxWidth="500" HorizontalAlignment="Center" Margin="0,70,0,0">
+            <Grid Margin="0,0,0,28">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
               <StackPanel>
-                <TextBlock x:Name="EmptyTitle" Text="Welcome to Monkey TV" FontSize="24" FontWeight="SemiBold" HorizontalAlignment="Center"/>
-                <TextBlock x:Name="EmptyDescription" Text="Choose the streaming services you use to get started." Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" TextAlignment="Center" LineHeight="20" Margin="0,10,0,20"/>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"><Button x:Name="EmptyChooseButton" Style="{StaticResource AccentButton}" Content="Choose Services" Click="AddManageServices_Click" Margin="0,0,10,0"/><Button x:Name="EmptyAddButton" Content="Add a custom service" Click="AddService_Click"/></StackPanel>
+                <TextBlock x:Name="ServicesHeadingText" Text="Services" FontSize="36" FontWeight="SemiBold"/>
+                <TextBlock x:Name="ServicesDescriptionText" Text="Your personal streaming library." Foreground="{DynamicResource MutedBrush}" FontSize="15" Margin="0,8,0,0"/>
               </StackPanel>
-            </Border>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button x:Name="ServicesLibraryButton" Content="Browse services" Click="ServicesLibrary_Click" Margin="0,0,10,0"/>
+                <Button Style="{StaticResource AccentButton}" Content="Add custom service" Click="AddService_Click"/>
+              </StackPanel>
+            </Grid>
+            <StackPanel>
+              <TextBlock x:Name="ServicesSearchLabel" Text="Search services" Foreground="{DynamicResource MutedBrush}" FontSize="12" Margin="0,0,0,6"/>
+              <TextBox x:Name="ServicesPrototypeSearch" TextChanged="ServicesPrototypeSearch_TextChanged" Padding="12,9" Margin="0,0,0,12" ToolTip="Search services"/>
+              <Grid x:Name="ServicesCatalogControls" Visibility="Collapsed" Margin="0,0,0,24">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <ComboBox x:Name="ServicesCatalogRegionBox" Width="170" SelectionChanged="ServicesCatalogRegion_Changed">
+                  <ComboBoxItem Content="All"/><ComboBoxItem Content="Global"/><ComboBoxItem Content="Canada"/><ComboBoxItem Content="USA"/><ComboBoxItem Content="UK"/><ComboBoxItem Content="Other"/>
+                </ComboBox>
+                <StackPanel Grid.Column="2" Orientation="Horizontal"><Button Content="Add all" Click="AddAllBuiltInServices_Click" Margin="0,0,10,0"/><Button Content="Remove all" Click="RemoveAllBuiltInServices_Click"/></StackPanel>
+              </Grid>
+              <WrapPanel x:Name="ServicesPrototypePanel" HorizontalAlignment="Center"/>
+            </StackPanel>
           </StackPanel>
         </ScrollViewer>
-      </Grid>
-    </Grid>
-
-    <Grid x:Name="BrowserView" Visibility="Collapsed" Background="Black">
-      <Border x:Name="BrowserControls" Visibility="Collapsed" Background="#FF17181D" Padding="12,8">
-        <StackPanel Orientation="Horizontal">
-          <Button x:Name="InlineBackButton" Content="←" Click="BrowserBack_Click" Padding="11,7" ToolTip="Back"/>
-          <Button x:Name="InlineForwardButton" Content="→" Click="BrowserForward_Click" Padding="11,7" ToolTip="Forward" Margin="4,0,0,0"/>
-          <Button Content="↻" Click="BrowserReload_Click" Padding="11,7" ToolTip="Reload" Margin="4,0"/>
-          <Button Content="⌂  Home" Click="BrowserHome_Click" Padding="12,7" ToolTip="Return Home; reopen this service to resume it"/>
-          <Button Content="⛶" Click="Fullscreen_Click" Padding="11,7" ToolTip="Toggle fullscreen (F11)" Margin="4,0,0,0"/>
-        </StackPanel>
-      </Border>
-      <Grid x:Name="BrowserHost"/>
-      <Border x:Name="LoadingOverlay" Background="{DynamicResource BackgroundBrush}">
-        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="360">
-          <Border Width="240" Height="135" CornerRadius="20" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" ClipToBounds="True">
-            <Border.Effect><DropShadowEffect Color="#FF000000" BlurRadius="28" ShadowDepth="7" Opacity="0.32"/></Border.Effect>
-            <Grid>
-              <Image x:Name="LoadingArtwork" Stretch="Uniform" Margin="14" Visibility="Collapsed"/>
-              <TextBlock x:Name="LoadingInitial" Text="M" FontSize="42" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        <ScrollViewer x:Name="SettingsPrototypeView" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Padding="48,38,48,56"><Grid MaxWidth="1020"><Grid.ColumnDefinitions><ColumnDefinition Width="178"/><ColumnDefinition Width="32"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Settings" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,18"/><Button Tag="General" Content="General" Style="{StaticResource TopNavButton}" HorizontalContentAlignment="Left" Click="SettingsSection_Click"/><Button Tag="Appearance" Content="Appearance" Style="{StaticResource TopNavButton}" HorizontalContentAlignment="Left" Click="SettingsSection_Click"/><Button Tag="Streaming" Content="Streaming" Style="{StaticResource TopNavButton}" HorizontalContentAlignment="Left" Click="SettingsSection_Click"/><Button Tag="VPN" Content="VPN Location" Style="{StaticResource TopNavButton}" HorizontalContentAlignment="Left" Click="SettingsSection_Click"/><Button Tag="Storage" Content="Storage &amp; Data" Style="{StaticResource TopNavButton}" HorizontalContentAlignment="Left" Click="SettingsSection_Click"/><Button Tag="About" Content="About" Style="{StaticResource TopNavButton}" HorizontalContentAlignment="Left" Click="SettingsSection_Click"/></StackPanel><StackPanel Grid.Column="2"><StackPanel x:Name="SettingsGeneralPanel"><TextBlock Text="General" FontSize="36" FontWeight="SemiBold"/><TextBlock Text="Startup and essential Monkey TV behavior." Foreground="{DynamicResource MutedBrush}" FontSize="15" Margin="0,8,0,30"/><Border Style="{StaticResource SectionCard}"><StackPanel><TextBlock Text="Startup" FontSize="21" FontWeight="SemiBold"/><UniformGrid Columns="2" Margin="0,20,0,18"><StackPanel Margin="0,0,16,0"><TextBlock Text="Start Monkey TV in" Margin="0,0,0,8"/><ComboBox x:Name="SettingsStartupModeBox"><ComboBoxItem Content="Home"/><ComboBoxItem Content="Last service"/></ComboBox></StackPanel><StackPanel Margin="0,0,16,0"><TextBlock Text="Close behavior" Margin="0,0,0,8"/><ComboBox x:Name="SettingsCloseBehaviorBox"><ComboBoxItem Content="Exit Monkey TV"/><ComboBoxItem Content="Ask before exiting"/></ComboBox></StackPanel></UniformGrid><CheckBox x:Name="SettingsFullscreenCheck" Content="Start Monkey TV in application fullscreen" Margin="0,0,0,20"/><Button Style="{StaticResource AccentButton}" Content="Save general settings" Click="SaveGeneralSettings_Click" HorizontalAlignment="Left"/></StackPanel></Border></StackPanel><StackPanel x:Name="SettingsAppearancePanel" Visibility="Collapsed"><TextBlock Text="Appearance" FontSize="36" FontWeight="SemiBold"/><TextBlock Text="Keep Monkey TV focused and comfortable to use." Foreground="{DynamicResource MutedBrush}" FontSize="15" Margin="0,8,0,30"/><Border Style="{StaticResource SectionCard}"><StackPanel><TextBlock Text="Appearance" FontSize="22" FontWeight="SemiBold"/><TextBlock Text="Preview theme and accent changes immediately, then save them." Foreground="{DynamicResource MutedBrush}" Margin="0,7,0,26"/><UniformGrid Columns="2" Margin="0,0,0,18"><StackPanel Margin="0,0,16,16"><TextBlock Text="Theme" Margin="0,0,0,8"/><ComboBox x:Name="PrototypeThemeBox" SelectionChanged="PrototypeAppearance_Changed"><ComboBoxItem Content="System"/><ComboBoxItem Content="Light"/><ComboBoxItem Content="Dark"/></ComboBox></StackPanel><StackPanel Margin="0,0,16,16"><TextBlock Text="Accent" Margin="0,0,0,8"/><ComboBox x:Name="PrototypeAccentBox" SelectionChanged="PrototypeAppearance_Changed"><ComboBoxItem Content="System / default"/><ComboBoxItem Content="Blue"/><ComboBoxItem Content="Purple"/><ComboBoxItem Content="Green"/><ComboBoxItem Content="Orange"/><ComboBoxItem Content="Red"/></ComboBox></StackPanel><StackPanel Margin="0,0,16,16"><TextBlock Text="Motion" Margin="0,0,0,8"/><ComboBox x:Name="PrototypeMotionBox"><ComboBoxItem Content="System"/><ComboBoxItem Content="Full"/><ComboBoxItem Content="Reduced"/></ComboBox></StackPanel><StackPanel Margin="0,0,16,16"><TextBlock Text="Card presentation" Margin="0,0,0,8"/><ComboBox x:Name="PrototypeCardStyleBox"><ComboBoxItem Content="Banner"/><ComboBoxItem Content="Square"/></ComboBox></StackPanel></UniformGrid><CheckBox x:Name="PrototypeShowNamesCheck" Content="Show service names" Margin="0,0,0,10"/><CheckBox x:Name="PrototypeShowClockCheck" Content="Show clock in the top bar" Margin="0,0,0,22"/><StackPanel Orientation="Horizontal"><Button Style="{StaticResource AccentButton}" Content="Save appearance" Click="PrototypeSaveAppearance_Click" Margin="0,0,10,0"/><Button Content="Back to Home" Click="HomeNav_Click"/></StackPanel></StackPanel></Border></StackPanel><StackPanel x:Name="SettingsStreamingPanel" Visibility="Collapsed"><TextBlock Text="Streaming" FontSize="36" FontWeight="SemiBold"/><TextBlock Text="Defaults and safe website behavior." Foreground="{DynamicResource MutedBrush}" FontSize="15" Margin="0,8,0,30"/><Border Style="{StaticResource SectionCard}"><StackPanel><TextBlock Text="New custom services" FontSize="21" FontWeight="SemiBold"/><TextBlock Text="Choose the starting experience for services you add yourself." Foreground="{DynamicResource MutedBrush}" Margin="0,7,0,18"/><ComboBox x:Name="SettingsExperienceBox" Width="260" HorizontalAlignment="Left"><ComboBoxItem Content="Default Experience"/><ComboBoxItem Content="TV Experience"/></ComboBox><TextBlock Text="External links" Margin="0,22,0,8"/><ComboBox x:Name="SettingsExternalLinksBox" Width="300" HorizontalAlignment="Left"><ComboBoxItem Content="Open in Windows default browser"/><ComboBoxItem Content="Ask first"/></ComboBox><Button Style="{StaticResource AccentButton}" Content="Save streaming settings" Click="SaveStreamingSettings_Click" HorizontalAlignment="Left" Margin="0,24,0,0"/></StackPanel></Border></StackPanel><StackPanel x:Name="SettingsVpnPanel" Visibility="Collapsed"><TextBlock Text="VPN Location" FontSize="36" FontWeight="SemiBold"/><TextBlock Text="Save one set of Nord service credentials to enable location choices." Foreground="{DynamicResource MutedBrush}" FontSize="15" Margin="0,8,0,30"/><Border Style="{StaticResource SectionCard}"><StackPanel><TextBlock Text="Nord service credentials" FontSize="21" FontWeight="SemiBold"/><TextBlock Text="These are the manual/service credentials from your Nord account, not your normal account password. They are protected for this Windows user." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,7,0,18"/><TextBlock Text="Service username"/><TextBox x:Name="SettingsNordUsernameBox" Margin="0,7,0,14"/><TextBlock Text="Service password"/><PasswordBox x:Name="SettingsNordPasswordBox" Margin="0,7,0,18"/><StackPanel Orientation="Horizontal"><Button Style="{StaticResource AccentButton}" Content="Save credentials" Click="SaveSettingsNordCredentials_Click" Margin="0,0,10,0"/><Button Content="Clear credentials" Click="ClearSettingsNordCredentials_Click"/></StackPanel><TextBlock x:Name="SettingsNordStatusText" Foreground="{DynamicResource MutedBrush}" Margin="0,14,0,0" TextWrapping="Wrap"/></StackPanel></Border><Border Style="{StaticResource SectionCard}" Margin="0,18,0,0"><StackPanel><TextBlock Text="Prepare locations" FontSize="21" FontWeight="SemiBold"/><TextBlock Text="Canada and United Kingdom are prepared once, then Monkey TV chooses an appropriate connection automatically." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,7,0,16"/><StackPanel Orientation="Horizontal"><ComboBox x:Name="SettingsVpnCountryBox" Width="230"><ComboBoxItem Content="Canada"/><ComboBoxItem Content="United Kingdom"/></ComboBox><Button Style="{StaticResource AccentButton}" Content="Prepare country" Click="PrepareSettingsVpnCountry_Click" Margin="12,0,0,0"/></StackPanel><TextBlock x:Name="SettingsVpnPrepareStatusText" Foreground="{DynamicResource MutedBrush}" Margin="0,14,0,0" TextWrapping="Wrap"/></StackPanel></Border></StackPanel><StackPanel x:Name="SettingsStoragePanel" Visibility="Collapsed"><TextBlock Text="Storage &amp; Data" FontSize="36" FontWeight="SemiBold"/><TextBlock Text="Monkey TV keeps portable data beside the app and preserves your streaming sign-ins by default." Foreground="{DynamicResource MutedBrush}" FontSize="15" Margin="0,8,0,30"/><Border Style="{StaticResource SectionCard}"><StackPanel><TextBlock Text="Portable storage" FontSize="21" FontWeight="SemiBold"/><TextBlock x:Name="SettingsStorageSummaryText" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,9,0,20"/><Button Content="Refresh storage" Click="RefreshIntegratedStorage_Click" HorizontalAlignment="Left"/></StackPanel></Border></StackPanel><StackPanel x:Name="SettingsAboutPanel" Visibility="Collapsed"><TextBlock Text="About Monkey TV" FontSize="36" FontWeight="SemiBold"/><TextBlock x:Name="SettingsAboutText" Foreground="{DynamicResource MutedBrush}" FontSize="15" LineHeight="22" Margin="0,12,0,30"/><Border Style="{StaticResource SectionCard}"><TextBlock Text="Monkey TV is a personal streaming-site launcher. It does not host, download, record, or alter provider content." TextWrapping="Wrap" LineHeight="21"/></Border></StackPanel></StackPanel></Grid></ScrollViewer>
+        <Grid x:Name="ServiceEditorOverlay" Visibility="Collapsed" Panel.ZIndex="900">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="760"/></Grid.ColumnDefinitions>
+          <Border x:Name="ServiceEditorScrim" Grid.ColumnSpan="2" Background="#68000000" Opacity="0" MouseLeftButtonDown="ServiceEditorScrim_MouseLeftButtonDown"/>
+          <Border x:Name="ServiceEditorDrawer" Grid.Column="1" Background="{DynamicResource BackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1,0,0,0">
+            <Border.RenderTransform><TranslateTransform x:Name="ServiceEditorDrawerTransform" X="760"/></Border.RenderTransform>
+            <ContentControl x:Name="ServiceEditorHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
+          </Border>
+        </Grid>
+        <Grid x:Name="VpnLocationDrawerOverlay" Visibility="Collapsed" Panel.ZIndex="910">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="520"/></Grid.ColumnDefinitions>
+          <Border x:Name="VpnLocationDrawerScrim" Grid.ColumnSpan="2" Background="#68000000" Opacity="0" MouseLeftButtonDown="VpnLocationDrawerScrim_MouseLeftButtonDown"/>
+          <Border x:Name="VpnLocationDrawer" Grid.Column="1" Background="{DynamicResource BackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1,0,0,0">
+            <Border.RenderTransform><TranslateTransform x:Name="VpnLocationDrawerTransform" X="520"/></Border.RenderTransform>
+            <Grid Margin="30,26,30,28">
+              <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+              <Grid Margin="0,0,0,22"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="VPN Location" FontSize="28" FontWeight="SemiBold"/><TextBlock Text="Choose the route used by Monkey TV websites." Foreground="{DynamicResource MutedBrush}" FontSize="14" Margin="0,5,0,0"/></StackPanel><Button Grid.Column="1" Content="✕" Click="VpnLocationDrawerClose_Click" Width="42" Height="42" Padding="0" ToolTip="Close VPN Location"/></Grid>
+              <Border Grid.Row="1" Background="{DynamicResource AccentSubtleBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="12" Padding="15" Margin="0,0,0,18"><StackPanel><TextBlock x:Name="VpnDrawerStatusText" FontSize="17" FontWeight="SemiBold"/><TextBlock x:Name="VpnDrawerStatusDetail" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,5,0,0"/></StackPanel></Border>
+              <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"><StackPanel x:Name="VpnDrawerChoices" Margin="0,0,8,0">
+                <Button x:Name="VpnDirectButton" Click="VpnDrawerDirect_Click" HorizontalContentAlignment="Stretch" Padding="16,14" Margin="0,0,0,10"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="42"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="⌁" FontSize="20" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/><StackPanel Grid.Column="1"><TextBlock Text="Direct" FontSize="17" FontWeight="SemiBold"/><TextBlock Text="Use your normal connection" Foreground="{DynamicResource MutedBrush}" Margin="0,3,0,0"/></StackPanel></Grid></Button>
+                <Button x:Name="VpnUsaButton" Click="VpnDrawerUsa_Click" HorizontalContentAlignment="Stretch" Padding="16,14" Margin="0,0,0,6"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="42"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="US" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/><StackPanel Grid.Column="1"><TextBlock Text="United States" FontSize="17" FontWeight="SemiBold"/><TextBlock Text="Automatic or choose a city" Foreground="{DynamicResource MutedBrush}" Margin="0,3,0,0"/></StackPanel><TextBlock x:Name="VpnUsaChevron" Grid.Column="2" Text="⌄" FontSize="18" VerticalAlignment="Center"/></Grid></Button>
+                <StackPanel x:Name="VpnUsaLocationsPanel" Visibility="Collapsed" Margin="24,0,0,10"/>
+                <Button x:Name="VpnCanadaButton" Click="VpnDrawerCanada_Click" HorizontalContentAlignment="Stretch" Padding="16,14" Margin="0,0,0,6"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="42"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="CA" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/><StackPanel Grid.Column="1"><TextBlock Text="Canada" FontSize="17" FontWeight="SemiBold"/><TextBlock Text="Automatic connection" Foreground="{DynamicResource MutedBrush}" Margin="0,3,0,0"/></StackPanel></Grid></Button>
+                <TextBlock x:Name="VpnCanadaSetupText" Visibility="Collapsed" Text="Set up Canada in Settings → VPN Location before connecting." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="18,0,8,10"/>
+                <Button x:Name="VpnUnitedKingdomButton" Click="VpnDrawerUnitedKingdom_Click" HorizontalContentAlignment="Stretch" Padding="16,14" Margin="0,0,0,6"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="42"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="UK" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/><StackPanel Grid.Column="1"><TextBlock Text="United Kingdom" FontSize="17" FontWeight="SemiBold"/><TextBlock Text="Automatic connection" Foreground="{DynamicResource MutedBrush}" Margin="0,3,0,0"/></StackPanel></Grid></Button>
+                <TextBlock x:Name="VpnUnitedKingdomSetupText" Visibility="Collapsed" Text="Set up United Kingdom in Settings → VPN Location before connecting." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="18,0,8,10"/>
+                <StackPanel x:Name="VpnDrawerSetupPanel" Visibility="Collapsed" Margin="0,12,0,0"><TextBlock x:Name="VpnDrawerSetupText" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,0,0,10"/><Button Content="Open VPN Location Settings" Click="VpnDrawerOpenSettings_Click" HorizontalAlignment="Left"/></StackPanel>
+              </StackPanel></ScrollViewer>
             </Grid>
           </Border>
-          <TextBlock x:Name="LoadingText" Text="Launching service…" FontSize="19" FontWeight="SemiBold" Margin="0,24,0,0" HorizontalAlignment="Center"/>
-          <ProgressBar IsIndeterminate="True" Width="128" Height="3" Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource ControlBrush}" Margin="0,18,0,0"/>
-          <Button Content="Home" Click="BrowserHome_Click" Padding="15,8" Margin="0,22,0,0" HorizontalAlignment="Center" ToolTip="Return to Monkey TV Home"/>
-        </StackPanel>
-      </Border>
-      <Border x:Name="ErrorOverlay" Visibility="Collapsed" Background="{DynamicResource BackgroundBrush}">
-        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="520">
-          <Border Width="50" Height="50" CornerRadius="16" Background="{DynamicResource AccentSubtleBrush}" HorizontalAlignment="Left"><TextBlock Text="&#xE783;" FontFamily="Segoe MDL2 Assets" FontSize="23" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
-          <TextBlock x:Name="ErrorTitle" Text="Couldn't load this service" FontSize="25" FontWeight="SemiBold" Margin="0,20,0,0"/>
-          <TextBlock x:Name="ErrorMessage" Text="Something went wrong while connecting to this service." Foreground="{StaticResource MutedBrush}" FontSize="14" TextWrapping="Wrap" LineHeight="21" Margin="0,10,0,0"/>
-          <StackPanel Orientation="Horizontal" Margin="0,22,0,0"><Button Style="{StaticResource AccentButton}" Content="Retry" Click="RetryService_Click" Margin="0,0,10,0"/><Button Content="Home" Click="BrowserHome_Click"/></StackPanel>
-          <Expander Header="Details" Margin="0,18,0,0"><StackPanel><TextBlock x:Name="ErrorDetails" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" Margin="0,8,0,0"/><Button Content="Copy Details" Click="CopyErrorDetails_Click" HorizontalAlignment="Left" Margin="0,12,0,0"/></StackPanel></Expander>
-        </StackPanel>
-      </Border>
+        </Grid>
+      </Grid>
     </Grid>
-    <Border x:Name="ShutdownOverlay" Visibility="Collapsed" Panel.ZIndex="1000" Background="{DynamicResource BackgroundBrush}">
-      <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-        <Border Width="58" Height="58" CornerRadius="18" Background="{DynamicResource AccentBrush}">
-          <TextBlock Text="M" Foreground="{DynamicResource AccentTextBrush}" FontSize="25" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+    <Grid x:Name="BrowserView" Visibility="Collapsed" Background="Black">
+      <Border x:Name="BrowserControls" Visibility="Collapsed" Background="#FF17181D" Padding="12,8"><StackPanel Orientation="Horizontal"><Button x:Name="InlineBackButton" Content="←" Click="BrowserBack_Click" Padding="11,7"/><Button x:Name="InlineForwardButton" Content="→" Click="BrowserForward_Click" Padding="11,7" Margin="4,0"/><Button Content="↻" Click="BrowserReload_Click" Padding="11,7"/><Button Content="⌂  Home" Click="BrowserHome_Click" Padding="12,7"/><Button Content="⛶" Click="Fullscreen_Click" Padding="11,7"/></StackPanel></Border>
+      <Grid x:Name="BrowserHost"/>
+      <Border x:Name="LoadingOverlay" Background="{DynamicResource BackgroundBrush}">
+        <Border HorizontalAlignment="Center" VerticalAlignment="Center" Width="540" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="18" Padding="28">
+          <Border.Effect><DropShadowEffect Color="Black" BlurRadius="26" ShadowDepth="7" Opacity=".22"/></Border.Effect>
+          <StackPanel>
+            <Border Height="270" CornerRadius="13" Background="{DynamicResource SubtleSurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" ClipToBounds="True">
+              <Grid><Image x:Name="LoadingArtwork" Stretch="UniformToFill" Visibility="Collapsed"/><TextBlock x:Name="LoadingInitial" Text="M" FontSize="58" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid>
+            </Border>
+            <TextBlock x:Name="LoadingText" Text="Opening service" FontSize="25" FontWeight="SemiBold" Margin="0,24,0,0" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"/>
+            <Border Background="{DynamicResource AccentSubtleBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="9" Padding="13,9" Margin="0,13,0,0" HorizontalAlignment="Center">
+              <StackPanel Orientation="Horizontal"><Ellipse Width="7" Height="7" Fill="{DynamicResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,9,0"/><TextBlock x:Name="LoadingStatusText" Text="Preparing service…" FontSize="15" Foreground="{DynamicResource TextBrush}" TextAlignment="Center" TextWrapping="Wrap"/></StackPanel>
+            </Border>
+            <Button Content="Home" Click="BrowserHome_Click" Margin="0,23,0,0" HorizontalAlignment="Center" MinWidth="112"/>
+          </StackPanel>
         </Border>
-        <TextBlock Text="Shutting down Monkey TV…" FontSize="18" FontWeight="SemiBold" Margin="0,20,0,0"/>
-        <ProgressBar IsIndeterminate="True" Width="120" Height="3" Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource ControlBrush}" Margin="0,18,0,0"/>
-      </StackPanel>
-    </Border>
+      </Border>
+      <Border x:Name="ErrorOverlay" Visibility="Collapsed" Background="{DynamicResource BackgroundBrush}"><StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="520"><Border Width="270" Height="152" CornerRadius="13" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" ClipToBounds="True"><Grid><Image x:Name="ErrorArtwork" Stretch="UniformToFill" Visibility="Collapsed"/><TextBlock x:Name="ErrorInitial" FontSize="42" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid></Border><TextBlock x:Name="ErrorTitle" Text="Couldn't load this service" FontSize="25" FontWeight="SemiBold" Margin="0,22,0,0" HorizontalAlignment="Center"/><TextBlock x:Name="ErrorMessage" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,10,0,0" TextAlignment="Center"/><StackPanel Orientation="Horizontal" Margin="0,22,0,0" HorizontalAlignment="Center"><Button Style="{StaticResource AccentButton}" Content="Retry" Click="RetryService_Click" Margin="0,0,10,0"/><Button Content="Home" Click="BrowserHome_Click"/></StackPanel><Expander Header="Details" Margin="0,18,0,0"><StackPanel><TextBlock x:Name="ErrorDetails" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12"/><Button Content="Copy Details" Click="CopyErrorDetails_Click" HorizontalAlignment="Left" Margin="0,12,0,0"/></StackPanel></Expander></StackPanel></Border>
+    </Grid>
+    <Border x:Name="ShutdownOverlay" Visibility="Collapsed" Panel.ZIndex="1000" Background="{DynamicResource BackgroundBrush}"><StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"><TextBlock Text="Shutting down Monkey TV…" FontSize="18" FontWeight="SemiBold"/><ProgressBar IsIndeterminate="True" Width="120" Height="3" Margin="0,18,0,0"/></StackPanel></Border>
   </Grid>
 </Window>

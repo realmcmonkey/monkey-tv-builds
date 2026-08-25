@@ -45,6 +45,17 @@ public sealed class SettingsStore
     private static bool Migrate(MonkeySettings settings)
     {
         var changed = false;
+        if (settings.VpnLocationV2ExperimentEnabled)
+        {
+            settings.CurrentLocationEnabled = true;
+            settings.VpnLocationV2ExperimentEnabled = false;
+            changed = true;
+        }
+        if (settings.LastUsedVpnLocation is null && settings.LastUsedNordLocation is { } legacyLast)
+        {
+            settings.LastUsedVpnLocation = new VpnLocationLastUsed { Kind = VpnLocationKind.Socks5, Socks5Location = legacyLast };
+            changed = true;
+        }
         if (settings.Services is null)
         {
             settings.Services = new List<ServiceDefinition>();

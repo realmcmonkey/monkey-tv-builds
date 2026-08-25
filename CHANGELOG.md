@@ -2,6 +2,83 @@
 
 This is the detailed official release history. GitHub release pages contain a short summary and link here. Features described as requiring manual testing were not claimed as provider-verified.
 
+## v0.06-alpha — Build #1
+
+### Internal cleanup
+
+- Made the maintained native VPN-helper build launcher portable across development PCs and documented runtime transfer plus optional native-tooling prerequisites.
+- Removed an unused legacy Current Location popup and abandoned update-check abstraction, along with smoke assertions that covered only that unused abstraction. The current in-app VPN Location drawer and all active routing paths are unchanged.
+- Removed the retired standalone Settings and Choose Services windows after their remaining entry points moved to the integrated main-window Settings and Services experiences.
+- Moved the active user-mode WFP containment policy out of the historical proof project and into production source; the proof project retains its independent copy.
+- Moved the maintained native OpenVPN/lwIP helper source, pinned vendor inputs, and rebuild provenance from `tests` to `native/MonkeyTV.UserSpaceOpenVpnHelper` while retaining the current runtime helper filename for compatibility.
+- Removed the retired RasDial, RouteGateway, and WFP containment proof projects after their production paths and maintained source provenance had been migrated.
+
+### Integrated Monkey TV experience
+
+- Rebuilt Monkey TV around an integrated main-window experience with persistent **Home**, **Services**, and **Settings** navigation, while preserving the existing shared browser, session, fullscreen, and VPN lifecycles.
+- Redesigned Home into an artwork-first streaming launcher with persistent Favorites, independently centered rows of up to four favorite services, and a distinct four-card **Other Services** browsing rail.
+- Added persistent service organization fields for favorites and Home visibility. Hidden services remain configured and manageable from Services without appearing on Home.
+- Improved the Services workspace into the complete service-library view for searching, opening, editing, favoriting, hiding, reordering, changing artwork, clearing a service’s temporary data, and removing services.
+- Moved the built-in service catalog into the integrated Services workspace, with search, region filtering, artwork, add/remove/restore actions, duplicate protection, and bulk add/remove controls.
+- Updated First-Time Setup to use the same staged built-in service catalog instead of opening the legacy service-management window; rerun setup still changes no existing data until Finish.
+- Refined service-card presentation with true 16:9 artwork, stronger hover/pressed/keyboard-focus feedback, light-blue accent styling, correct Fit/Fill rendering, graceful artwork fallbacks, and automatic trimming of baked-in black side bars where detected.
+- Made Other Services rail controls accurately dim and disable when there are no additional services in that direction, including after scrolling, resizing, or library changes.
+- Kept the primary navigation centered independently of VPN controls, improved fullscreen presentation, and retained the top-bar VPN Location selector, clock, and fullscreen control.
+
+### Service editing and launch behavior
+
+- Added meaningful unsaved-change protection to Edit Service. Implicit dismissal now offers Save Changes, Discard Changes, or Keep Editing, while explicit Save and Cancel remain immediate and unchanged.
+- Made the Edit Service and VPN Location drawers safely dismissible with Escape or a click on their dimmed backdrop. Edit Service retains its unsaved-change protection; VPN Location closes without altering the active route.
+- Fixed Edit Service Escape/backdrop dismissal after changing a field: it now reliably opens the Save, Discard, or Keep Editing prompt without crashing or appearing unresponsive.
+- Moved Edit Service into a scrollable in-app right-side drawer that opens over the originating Home or Services view, preserves that view when closed, dims the background, and uses reduced-motion-aware drawer transitions.
+- Moved Add Custom Service into the same in-app editor drawer. New-service drafts remain unsaved until validation succeeds and Save is selected.
+- Added a live service-card artwork preview to Edit Service using the same artwork, Fit/Fill, fallback, and name-rendering behavior as Home and Services cards.
+- Added **Test URL** and **Test Configuration** actions for safely trying an edited, unsaved URL and browser experience without saving temporary changes or creating another browser profile.
+- Improved the browser-experience editor with a clearer effective Default, TV Experience, or Custom user-agent summary, inline validation, loading feedback, and theme-safe dropdown text.
+- Added an optional per-service Preferred VPN Location: **None**, **USA**, **Canada**, or **United Kingdom**. Preferences default to None and remain a launch suggestion only.
+- Added **Direct** as a per-service Preferred VPN Location. Unlike None, it explicitly asks to return to the verified Direct route before opening a service when another location is active.
+- When a service preference differs from the active location, Monkey TV now offers **Switch & Open**, **Open Anyway**, or **Cancel**. Switch & Open reuses the existing verified VPN routing flow and does not navigate until the requested route is ready.
+- Fixed preferred-location service switching so the previous service is not reloaded or opened externally while Monkey TV changes routes for the newly selected service.
+- Made verified VPN service launches reveal the provider at the real DOM-ready stage instead of waiting indefinitely for a delayed final navigation-completion event.
+- Made Preferred VPN Location changes local metadata-only saves. Editing or saving a preference never connects, prepares, downloads, verifies, or initializes a VPN route.
+- Unified Reset Service behind one core reset operation. Resetting from the browser still reloads the active service immediately; resetting from Edit Service stays in the editor and marks only that service for a fresh reload on its next activation.
+- Rebuilt the service launch overlay around real lifecycle status, with configured artwork, clear route/browser preparation messages, verified VPN connection and fallback status where applicable, safe error recovery, and no fake percentages or artificial delays.
+- Modernized the Preferred VPN Location confirmation and launch-progress surfaces to match the current Monkey TV theme, including restrained motion and Reduced Motion support.
+
+### VPN Location
+
+- Consolidated the user-facing VPN experience into one **VPN Location** feature with a top-bar drawer for **Direct**, **United States**, **Canada**, and **United Kingdom**.
+- Redirected missing USA service-credential setup into the integrated **Settings → VPN Location** page instead of opening the retired standalone Settings window.
+- Retained existing USA automatic and city choices, while keeping Canada and United Kingdom setup, server selection, fallback, verification, containment, and cleanup behind the simplified interface.
+- Removed everyday V1, V2, experiment, configuration-file, and routing-engine terminology from normal VPN Location screens while preserving the established routing behavior internally.
+- Kept VPN switching route-before-navigation, verification, safe failure handling, Direct behavior, and active-route preservation unchanged.
+
+### Settings, accessibility, and visual polish
+
+- Replaced the legacy black-backed Monkey TV branding with the new transparent logo throughout Monkey TV, including the application icon, and made the splash artwork a much more prominent part of its startup composition.
+- Rebuilt Settings into an integrated desktop workspace with General, Appearance, Streaming, VPN Location, Storage & Data, and About categories.
+- Improved Settings typography, control sizing, sidebar selection states, responsive content sizing, checkbox/dropdown readability, and content cards that size to their actual settings instead of leaving unnecessary empty space.
+- Increased Home section-heading readability and aligned typography across Home, Services, Settings, drawers, dialogs, and controls.
+- Added/refined lightweight WPF animations for cards, navigation, settings categories, menus, drawers, dialogs, pages, and existing loading/error states. Reduced Motion uses instant or minimal-fade behavior.
+- Rebuilt the standalone Monkey TV experience around the current shell’s layout language: the provider-free splash, alpha welcome, first-run wizard, compact website-permission card, confirmations, and recovery surfaces now use purpose-built branded compositions rather than legacy utility-dialog layouts. Existing startup, alpha-dismissal, permission, and setup behavior is unchanged.
+- Restyled context menus, tooltips, dropdowns, dialogs, confirmations, loading states, and errors to better match the integrated application rather than default utility-style WPF surfaces.
+
+### Website permissions, storage, and cleanup
+
+- Reused the existing safe **Clear Temporary Data** cleanup automatically when switching to a different service and after the shared browser is disposed during normal shutdown. Home/same-service resume remains untouched, and cleanup stays bounded.
+- Added a safe **Run first-time setup again** action in Storage & Data. It opens the setup wizard without changing existing data; only finishing the wizard resets Monkey TV data while retaining `Data\Requirements` and then saves the newly selected setup.
+- Persist explicit Allow/Deny decisions for camera, microphone, location, and clipboard-read requests by exact normalized origin and permission type.
+- Reuse saved permission decisions across Monkey TV restarts and same-profile popup WebViews, coalesce duplicate simultaneous requests, and continue denying notifications and unsupported privileged permissions conservatively.
+- Made Reset Service clear permission decisions associated with that service, and made Reset All Website Data clear all saved website permission decisions.
+- Kept saved permission decisions out of configuration exports and backups.
+- Improved normal shutdown cleanup using supported WebView2 cache clearing followed by bounded cleanup of verified disposable browser/runtime data such as disk cache, code/GPU/shader cache, metrics, crash artifacts, replaceable components, and temporary Monkey TV files.
+- Preserved cookies, login sessions, Local Storage, IndexedDB, Cache Storage, service-worker state, legitimate provider/DRM state, preferences, VPN data, `Data\\Requirements`, and saved website permissions during normal shutdown cleanup.
+- Corrected Storage & Data totals, About reporting, and copied diagnostics so bundled files beneath `Data\\Requirements` are excluded from normal user-data storage totals while remaining untouched.
+
+### Documentation
+
+- Updated the README, build guidance, architecture notes, VPN Location guidance, alpha-testing checklist, known limitations, and third-party notices to reflect the current integrated interface, portable test-build layout, service workflow, and VPN safety boundaries.
+
 ## v0.05-alpha — Build #1
 
 - Optimized the local V2 test distributable without pruning any Microsoft Fixed Runtime component: native helper inputs now come from a stable runtime dependency folder, Release debug payload is disabled, and clean publishes exclude profiles, logs, credentials, downloaded configurations, and build/test intermediates.

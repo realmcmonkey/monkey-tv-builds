@@ -1,19 +1,28 @@
 <Window x:Class="MonkeyTV.ConfirmWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Confirm" Width="480" Height="285" WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Title="Monkey TV" Width="600" Height="360" WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent">
-  <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="16" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="30">
+  <Border x:Name="DialogSurface" Background="{DynamicResource BackgroundBrush}" CornerRadius="20" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Opacity="0" RenderTransformOrigin="0.5,0.5" ClipToBounds="True">
+    <Border.RenderTransform><ScaleTransform x:Name="DialogScale" ScaleX="0.985" ScaleY="0.985"/></Border.RenderTransform>
+    <Border.Effect><DropShadowEffect Color="Black" BlurRadius="30" ShadowDepth="8" Opacity="0.34"/></Border.Effect>
     <Grid>
       <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-      <StackPanel>
-        <TextBlock x:Name="Heading" FontSize="23" FontWeight="SemiBold"/>
-        <TextBlock x:Name="Message" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" LineHeight="20" Margin="0,15,0,0"/>
-      </StackPanel>
-      <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
-        <Button Content="Cancel" Click="Cancel_Click" Margin="0,0,10,0"/>
-        <Button x:Name="ConfirmButton" Style="{StaticResource AccentButton}" Content="Confirm" Click="Confirm_Click" MinWidth="100"/>
-      </StackPanel>
+      <Grid Margin="34,30,34,28">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="54"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+        <Border x:Name="DialogIconSurface" Width="42" Height="42" CornerRadius="13" Background="{DynamicResource AccentSubtleBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" VerticalAlignment="Top">
+          <TextBlock x:Name="DialogIcon" Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+        <StackPanel Grid.Column="1">
+          <Border x:Name="RequestBadge" Visibility="Collapsed" Background="{DynamicResource AccentSubtleBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="8" Padding="9,5" HorizontalAlignment="Left" Margin="0,0,0,12"><TextBlock x:Name="RequestBadgeText" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"/></Border>
+          <TextBlock x:Name="Heading" FontSize="26" FontWeight="SemiBold" TextWrapping="Wrap"/>
+          <Border x:Name="PermissionSummary" Visibility="Collapsed" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="15,13" Margin="0,16,0,0">
+            <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="REQUESTING SITE" Foreground="{DynamicResource MutedBrush}" FontSize="11" FontWeight="SemiBold"/><TextBlock x:Name="PermissionOrigin" FontSize="18" FontWeight="SemiBold" Margin="0,4,0,0"/></StackPanel><StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="20,0,0,0"><TextBlock Text="ACCESS" Foreground="{DynamicResource MutedBrush}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right"/><TextBlock x:Name="PermissionCapability" Foreground="{DynamicResource AccentBrush}" FontSize="16" FontWeight="SemiBold" Margin="0,4,0,0" HorizontalAlignment="Right"/></StackPanel></Grid>
+          </Border>
+          <TextBlock x:Name="Message" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" LineHeight="22" FontSize="15" Margin="0,15,0,0"/>
+        </StackPanel>
+      </Grid>
+      <Border Grid.Row="1" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="34,18"><StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><Button x:Name="CancelButton" Content="Cancel" Click="Cancel_Click" Margin="0,0,10,0" MinWidth="112"/><Button x:Name="ConfirmButton" Style="{StaticResource AccentButton}" Content="Confirm" Click="Confirm_Click" MinWidth="126"/></StackPanel></Border>
     </Grid>
   </Border>
 </Window>

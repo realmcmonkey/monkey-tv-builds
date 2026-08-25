@@ -9,7 +9,8 @@ public partial class PopupWebViewWindow : Window
 
     internal CoreWebView2 Core => PopupView.CoreWebView2;
 
-    internal async Task InitializeAsync(CoreWebView2Environment environment, string? userAgent)
+    internal async Task InitializeAsync(CoreWebView2Environment environment, string? userAgent,
+        EventHandler<CoreWebView2PermissionRequestedEventArgs>? permissionRequested = null)
     {
         await PopupView.EnsureCoreWebView2Async(environment);
         PopupView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
@@ -18,6 +19,7 @@ public partial class PopupWebViewWindow : Window
         PopupView.CoreWebView2.Settings.IsZoomControlEnabled = false;
         PopupView.ZoomFactor = 1.0;
         if (!string.IsNullOrWhiteSpace(userAgent)) PopupView.CoreWebView2.Settings.UserAgent = userAgent;
+        if (permissionRequested is not null) PopupView.CoreWebView2.PermissionRequested += permissionRequested;
         PopupView.CoreWebView2.WindowCloseRequested += (_, _) => Dispatcher.BeginInvoke(Close);
         PopupView.CoreWebView2.NewWindowRequested += (_, e) =>
         {
